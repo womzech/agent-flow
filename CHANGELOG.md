@@ -2,6 +2,59 @@
 
 本仓库遵循 [Semantic Versioning](https://semver.org/) 与 [Keep a Changelog](https://keepachangelog.com/) 风格。
 
+## v0.4.0 — 2026-05-14 · Security & Scale Hardening
+
+第四轮迭代：闭合 v0.3 → v0.4 review 中识别的 8 个 P0/P1 安全 & 可扩展性 gap。设计文档：`docs/v0.4-hardening-design.md`。9 个原子 commit。
+
+### Security
+
+- **Rate limiting**（`src/lib/ratelimit.ts`）— 单进程内存 token bucket，按 (route, key) 隔离，可注入时钟做确定性测试。应用到：
+  - `POST /login` — 5/15min per (ip+email)，20/15min per ip
+  - `POST /api/wecom/callback` — 100/min 全局
+  - `POST /api/diagnostics/[id]/generate` — 10/hour per user
+  - `POST /api/deliverables/[id]/bundle` — 30/hour per user
+  - `POST` TOTP step — 5/5min per user
+  - 标准 headers：`X-RateLimit-Limit/-Remaining/-Reset/Retry-After`
+- **CSRF**（`src/lib/csrf.ts`）— double-submit cookie 模式，HMAC-SHA256 签名。Server Actions 不需要（Next.js 已内置 Origin/Referer 校验），仅保护 `/api/*` mutating routes。Bearer 请求自动豁免。中间件在 Edge runtime 用 WebCrypto subtle 签发 cookie。
+- **`/api/auth/logout` 改 POST + CSRF**：v0.3 的 GET 端点是经典 CSRF 漂移（`<img src=>` 可强制登出），已禁用 GET 返回 405。
+- **API tokens (PAT)**（`src/lib/api-tokens.ts`）— 程序化访问 token，格式 `agf_<32 base32>`，SHA-256 hash 存库，plaintext 仅创建时显示一次。`Authorization: Bearer agf_xxx` 替代 cookie。Token 继承用户角色权限。
+- **账号锁定 + Server-side sessions**（`src/lib/sessions.ts`）：
+  - `login_attempts` 表记录每次登录成败；同一 (email, ip) 在 15 分钟内 5 次失败 → 锁定。一次成功重置计数。
+  - `sessions` 表 + cookie 中 `sid` 字段，每次请求查 DB 判断是否被撤销。
+  - `/security/sessions` 让用户看 / 撤销自己的活跃会话和最近 10 次登录尝试。
+- **2FA TOTP**（`src/lib/totp.ts`，RFC 6238）：HMAC-SHA1 + 30s + 6 位，±1 step 漂移容忍。`/security/2fa` 启用 / 禁用流程；登录新增 TOTP 第二步（5 分钟有效的 pending cookie）。无 QR 库，显示 base32 + otpauth URI 供 Authenticator 应用接收。
+
+### Scale & UX
+
+- **分页 utility**（`src/lib/pagination.ts`）— `parsePagination(URLSearchParams)`, `pageMeta`, `pageHref`。Repo 层 `leadsRepo.list({limit, offset}) + .count()`。
+- **FTS5 全局搜索**（`src/lib/search.ts`）— SQLite FTS5 trigram tokenizer，跨 leads / clients / diagnostics / projects。`/search?q=...` 按权限过滤结果（无 `read:clients` 看不到 client 命中），首次访问惰性 rebuild 索引。Topbar 新增搜索框。
+- **`/security` 总览页**：4 个 KPI 卡 + 安全 checklist + 跨 2FA / sessions / tokens 的导航。
+
+### Schema v4
+
+- `api_tokens(id, user_id, token_hash, token_prefix, name, last_used_at, revoked_at, created_at)`
+- `login_attempts(id, email, ip, ok, at)`
+- `sessions(id, user_id, jti, ip, user_agent, last_used_at, revoked_at, created_at)`
+- `users.totp_secret` + `users.totp_enabled` （通过 `ALTER TABLE ADD COLUMN` 幂等迁移）
+- 虚表 `search_index` (FTS5 trigram)
+- v3 → v4 自动升级，无需运维干预
+
+### 测试
+
+- **150 个用例 / 35 个 suite**（v0.3 的 87 个基础上 +63）。
+- 新增覆盖：
+  - `ratelimit.test.ts` (9)：token bucket 行为 + 头部 + IP 提取
+  - `csrf.test.ts` (7)：签名校验 + double-submit + Bearer bypass
+  - `api-tokens.test.ts` (8)：plaintext-once + resolve + revoke + 跨用户隔离
+  - `sessions.test.ts` (8)：session CRUD + lockout 阈值 + 成功重置 + IP 独立
+  - `totp.test.ts` (15)：base32 + 5 个 RFC 6238 时间点 + ±1 step + 拒绝 malformed + otpauth URI
+  - `pagination.test.ts` (9)：默认 / clamp / NaN / pageMeta / pageHref
+  - `search.test.ts` (7)：CJK 三元组 + body 字段 + 权限过滤 + 空查询 + rebuildAll
+
+### 部署
+
+`.env.example` 已通过 v0.3 PR 同步；v0.4 无新 ENV。CSRF 用现有 `AGENTFORGE_SESSION_SECRET`（默认回退 `AGENTFORGE_PASSWORD`）。
+
 ## v0.3.0 — 2026-05-13 · Multi-user RBAC + 企业微信
 
 第三轮迭代：从单租户单密码升级为多用户 + RBAC + 企业微信双向交互。设计文档：

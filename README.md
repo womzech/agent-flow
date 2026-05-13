@@ -133,7 +133,14 @@ CI 配置见 `.github/workflows/ci.yml`，矩阵 Node 18/20。
   - 58 个测试用例（基于 `node:test`，零新依赖）+ GitHub Actions CI
   - Clients CRUD + 列表搜索过滤 + 数据 CSV/JSON 导出 + 打印友好诊断版
   - 统一 API 错误形状 + Error/loading boundaries + 性能索引
-- [ ] **v0.4 进行中**：Security & Scale hardening（rate limit + CSRF + PAT + lockout + 2FA + 分页 + FTS5 全局搜索，见 `docs/v0.4-hardening-design.md`）
+- [x] **v0.4 Security & Scale hardening**（详见 `CHANGELOG.md` 与 `docs/v0.4-hardening-design.md`）：
+  - Token-bucket rate limiting：login / WeCom / AI generate / bundle / TOTP
+  - Double-submit CSRF tokens；logout 改 POST-only + GET 返回 405
+  - API tokens (PAT) — n8n / Zapier 集成；plaintext 仅显示一次
+  - Account lockout + 服务端 session 撤销 + 登录历史 UI
+  - 2FA TOTP (RFC 6238)，两步登录，5 分钟 pending cookie
+  - SQLite FTS5 trigram 全局搜索（CJK 友好，按权限过滤）
+  - 分页 utility + `/security` 总览页
 - [x] **v0.3 多用户 + RBAC + 企业微信**（详见 `CHANGELOG.md` 与 `docs/wecom-rbac-design.md`）：
   - 4 个内置角色 × 22 条权限 + PBKDF2 密码 + 签名 cookie 多用户 session
   - 企业微信自建应用：URL 验证 + 收消息 + 异步 LLM 回复 + 主动推送
