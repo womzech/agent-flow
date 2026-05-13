@@ -34,8 +34,26 @@ export function appliedMigrations(): { version: number; applied_at: string }[] {
 export function getDb(): Database.Database {
   if (!globalForDb.__agentforgeDb) {
     globalForDb.__agentforgeDb = open();
+    // Fire-and-forget RBAC bootstrap. We deliberately don't await here so
+    // tests / non-RBAC code paths don't pay the password-hashing latency
+    // (~100ms) on first call. `ensureBootstrapped()` is idempotent.
+    import("./bootstrap")
+      .then((m) => m.ensureBootstrapped())
+      .catch((err) => console.error("[db] bootstrap deferred error", err));
   }
   return globalForDb.__agentforgeDb;
+}
+
+/**
+ * Synchronous variant for code paths (login, /users page, tests) that need
+ * the admin user seeded BEFORE they read the users table. Awaiting this
+ * once at request start is fine; later calls are no-ops.
+ */
+export async function getDbReady(): Promise<Database.Database> {
+  const db = getDb();
+  const { ensureBootstrapped } = await import("./bootstrap");
+  await ensureBootstrapped();
+  return db;
 }
 
 export function withTransaction<T>(fn: (db: Database.Database) => T): T {

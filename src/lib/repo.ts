@@ -1,14 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { getDb } from "./db";
 import type {
+  Action,
   DiagnosticStatus,
   LeadSource,
   LeadStage,
+  Permission,
   ProjectStatus,
+  Resource,
   RevenueKind,
   TicketPriority,
   TicketStatus,
 } from "./schema";
+import { permKey } from "./schema";
 
 /** Row shapes — kept in sync with schema.ts. */
 
@@ -463,6 +467,158 @@ export const revenueRepo = {
       .prepare(`SELECT COALESCE(SUM(amount_cents),0) AS s FROM revenue_log WHERE kind='monthly' AND substr(paid_at,1,7)=?`)
       .get(yyyymm) as { s: number };
     return row.s;
+  },
+};
+
+/* ---------- RBAC: roles / permissions / users ---------- */
+
+export interface Role { id: number; name: string; description: string; is_system: number }
+export interface PermRow { id: number; action: Action; resource: Resource; description: string }
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+  password_hash: string;
+  password_salt: string;
+  password_iter: number;
+  wecom_userid: string | null;
+  role_id: number;
+  status: "active" | "disabled";
+  last_login_at: string | null;
+  created_at: string;
+}
+
+export const rolesRepo = {
+  list(): Role[] {
+    return getDb().prepare("SELECT * FROM roles ORDER BY id").all() as Role[];
+  },
+  get(id: number): Role | undefined {
+    return getDb().prepare("SELECT * FROM roles WHERE id = ?").get(id) as Role | undefined;
+  },
+  getByName(name: string): Role | undefined {
+    return getDb().prepare("SELECT * FROM roles WHERE name = ?").get(name) as Role | undefined;
+  },
+  upsertSystem(name: string, description: string): Role {
+    const existing = this.getByName(name);
+    if (existing) {
+      getDb().prepare("UPDATE roles SET description = ?, is_system = 1 WHERE id = ?").run(description, existing.id);
+      return this.get(existing.id)!;
+    }
+    const info = getDb()
+      .prepare("INSERT INTO roles (name, description, is_system) VALUES (?, ?, 1)")
+      .run(name, description);
+    return this.get(Number(info.lastInsertRowid))!;
+  },
+};
+
+export const permissionsRepo = {
+  list(): PermRow[] {
+    return getDb().prepare("SELECT * FROM permissions ORDER BY resource, action").all() as PermRow[];
+  },
+  get(action: Action, resource: Resource): PermRow | undefined {
+    return getDb().prepare("SELECT * FROM permissions WHERE action = ? AND resource = ?").get(action, resource) as PermRow | undefined;
+  },
+  upsert(action: Action, resource: Resource, description: string): PermRow {
+    const existing = this.get(action, resource);
+    if (existing) {
+      getDb().prepare("UPDATE permissions SET description = ? WHERE id = ?").run(description, existing.id);
+      return this.get(action, resource)!;
+    }
+    const info = getDb()
+      .prepare("INSERT INTO permissions (action, resource, description) VALUES (?, ?, ?)")
+      .run(action, resource, description);
+    return getDb().prepare("SELECT * FROM permissions WHERE id = ?").get(Number(info.lastInsertRowid)) as PermRow;
+  },
+  forRole(roleId: number): PermRow[] {
+    return getDb()
+      .prepare(
+        `SELECT p.* FROM permissions p
+         JOIN role_permissions rp ON rp.permission_id = p.id
+         WHERE rp.role_id = ? ORDER BY p.resource, p.action`,
+      )
+      .all(roleId) as PermRow[];
+  },
+  setRolePermissions(roleId: number, perms: Permission[]) {
+    const db = getDb();
+    const tx = db.transaction(() => {
+      db.prepare("DELETE FROM role_permissions WHERE role_id = ?").run(roleId);
+      const ins = db.prepare(
+        `INSERT INTO role_permissions (role_id, permission_id)
+         SELECT ?, id FROM permissions WHERE action = ? AND resource = ?`,
+      );
+      for (const p of perms) {
+        const [action, resource] = p.split(":") as [Action, Resource];
+        ins.run(roleId, action, resource);
+      }
+    });
+    tx();
+  },
+  permissionsForUser(userId: number): Set<Permission> {
+    const rows = getDb()
+      .prepare(
+        `SELECT p.action AS action, p.resource AS resource
+         FROM users u
+         JOIN role_permissions rp ON rp.role_id = u.role_id
+         JOIN permissions p ON p.id = rp.permission_id
+         WHERE u.id = ?`,
+      )
+      .all(userId) as { action: Action; resource: Resource }[];
+    const set = new Set<Permission>();
+    for (const r of rows) set.add(permKey(r.action, r.resource));
+    return set;
+  },
+};
+
+export const usersRepo = {
+  list(): User[] {
+    return getDb().prepare("SELECT * FROM users ORDER BY created_at DESC, id DESC").all() as User[];
+  },
+  get(id: number): User | undefined {
+    return getDb().prepare("SELECT * FROM users WHERE id = ?").get(id) as User | undefined;
+  },
+  getByEmail(email: string): User | undefined {
+    return getDb().prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase()) as User | undefined;
+  },
+  getByWecomUserid(wecom_userid: string): User | undefined {
+    return getDb().prepare("SELECT * FROM users WHERE wecom_userid = ?").get(wecom_userid.toLowerCase()) as User | undefined;
+  },
+  count(): number {
+    return (getDb().prepare("SELECT COUNT(*) AS c FROM users").get() as { c: number }).c;
+  },
+  create(input: Omit<User, "id" | "created_at" | "last_login_at" | "status"> & { status?: "active" | "disabled" }): User {
+    const info = getDb()
+      .prepare(
+        `INSERT INTO users (email, name, password_hash, password_salt, password_iter, wecom_userid, role_id, status)
+         VALUES (@email, @name, @password_hash, @password_salt, @password_iter, @wecom_userid, @role_id, COALESCE(@status, 'active'))`,
+      )
+      .run({
+        ...input,
+        email: input.email.toLowerCase(),
+        wecom_userid: input.wecom_userid ? input.wecom_userid.toLowerCase() : null,
+        status: input.status ?? null,
+      });
+    return this.get(Number(info.lastInsertRowid))!;
+  },
+  update(id: number, patch: Partial<Omit<User, "id" | "created_at">>): User | undefined {
+    const current = this.get(id);
+    if (!current) return undefined;
+    const next: User = {
+      ...current,
+      ...patch,
+      email: (patch.email ?? current.email).toLowerCase(),
+      wecom_userid: patch.wecom_userid === undefined ? current.wecom_userid : patch.wecom_userid ? patch.wecom_userid.toLowerCase() : null,
+    };
+    getDb()
+      .prepare(
+        `UPDATE users SET email=@email, name=@name, password_hash=@password_hash, password_salt=@password_salt,
+         password_iter=@password_iter, wecom_userid=@wecom_userid, role_id=@role_id, status=@status,
+         last_login_at=@last_login_at WHERE id=@id`,
+      )
+      .run(next);
+    return next;
+  },
+  touchLogin(id: number) {
+    getDb().prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(id);
   },
 };
 
