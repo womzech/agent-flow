@@ -37,13 +37,21 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: "安全 Security",
+    items: [
+      { href: "/security", label: "安全总览", hint: "2FA / sessions / tokens" },
+      { href: "/security/2fa", label: "两步验证", hint: "TOTP" },
+      { href: "/security/sessions", label: "活跃会话", hint: "登录历史 + 撤销" },
+      { href: "/api-tokens", label: "API Tokens", hint: "n8n / Zapier 集成" },
+    ],
+  },
+  {
     title: "运维 Ops",
     items: [
       { href: "/users", label: "用户管理", hint: "RBAC", require: "write:users" },
       { href: "/roles", label: "角色 / 权限", hint: "矩阵视图", require: "read:users" },
       { href: "/audit", label: "审计日志", hint: "全部状态变更", require: "read:audit" },
       { href: "/wecom", label: "企业微信", hint: "回调 / 推送", require: "write:wecom" },
-      { href: "/api-tokens", label: "API Tokens", hint: "n8n / Zapier 集成" },
       { href: "/settings", label: "Settings" },
     ],
   },
