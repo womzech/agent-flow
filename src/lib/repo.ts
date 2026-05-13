@@ -484,6 +484,8 @@ export interface User {
   wecom_userid: string | null;
   role_id: number;
   status: "active" | "disabled";
+  totp_secret: string | null;
+  totp_enabled: number;          // 0 | 1 (SQLite has no bool)
   last_login_at: string | null;
   created_at: string;
 }
@@ -585,17 +587,23 @@ export const usersRepo = {
   count(): number {
     return (getDb().prepare("SELECT COUNT(*) AS c FROM users").get() as { c: number }).c;
   },
-  create(input: Omit<User, "id" | "created_at" | "last_login_at" | "status"> & { status?: "active" | "disabled" }): User {
+  create(input: Omit<User, "id" | "created_at" | "last_login_at" | "status" | "totp_secret" | "totp_enabled"> & {
+    status?: "active" | "disabled";
+    totp_secret?: string | null;
+    totp_enabled?: number;
+  }): User {
     const info = getDb()
       .prepare(
-        `INSERT INTO users (email, name, password_hash, password_salt, password_iter, wecom_userid, role_id, status)
-         VALUES (@email, @name, @password_hash, @password_salt, @password_iter, @wecom_userid, @role_id, COALESCE(@status, 'active'))`,
+        `INSERT INTO users (email, name, password_hash, password_salt, password_iter, wecom_userid, role_id, status, totp_secret, totp_enabled)
+         VALUES (@email, @name, @password_hash, @password_salt, @password_iter, @wecom_userid, @role_id, COALESCE(@status, 'active'), @totp_secret, COALESCE(@totp_enabled, 0))`,
       )
       .run({
         ...input,
         email: input.email.toLowerCase(),
         wecom_userid: input.wecom_userid ? input.wecom_userid.toLowerCase() : null,
         status: input.status ?? null,
+        totp_secret: input.totp_secret ?? null,
+        totp_enabled: input.totp_enabled ?? null,
       });
     return this.get(Number(info.lastInsertRowid))!;
   },
@@ -612,6 +620,7 @@ export const usersRepo = {
       .prepare(
         `UPDATE users SET email=@email, name=@name, password_hash=@password_hash, password_salt=@password_salt,
          password_iter=@password_iter, wecom_userid=@wecom_userid, role_id=@role_id, status=@status,
+         totp_secret=@totp_secret, totp_enabled=@totp_enabled,
          last_login_at=@last_login_at WHERE id=@id`,
       )
       .run(next);
