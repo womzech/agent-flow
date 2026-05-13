@@ -12,7 +12,7 @@ interface HttpLikeError extends Error {
 export default function AppError({ error, reset }: { error: HttpLikeError; reset: () => void }) {
   useEffect(() => {
     // eslint-disable-next-line no-console
-    console.error("[AgentForge] route error:", error);
+    console.error("[AgentFlow] route error:", error);
   }, [error]);
 
   // HttpError thrown from requireUser / requirePermission carries a code in

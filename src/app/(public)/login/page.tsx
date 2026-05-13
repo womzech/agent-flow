@@ -9,7 +9,7 @@ import { consume, ipFromHeaders } from "@/lib/ratelimit";
 import { create as createSession, isLockedOut, recordAttempt } from "@/lib/sessions";
 import { fromBase32, verify as verifyTotp } from "@/lib/totp";
 
-const PENDING_2FA_COOKIE = "agentforge_pending_2fa";
+const PENDING_2FA_COOKIE = "agentflow_pending_2fa";
 const PENDING_TTL_SECONDS = 5 * 60;
 
 async function login(formData: FormData) {
@@ -77,12 +77,12 @@ async function login(formData: FormData) {
   //  - users table is empty (first-run before bootstrap created admin), OR
   //  - operator wants to skip typing the email and use the env password.
   // In both cases we look up admin@local (created by bootstrap from
-  // AGENTFORGE_PASSWORD) and require the same password.
-  if (!process.env.AGENTFORGE_PASSWORD) {
+  // AGENTFLOW_PASSWORD) and require the same password.
+  if (!process.env.AGENTFLOW_PASSWORD) {
     await sleep(800);
     return redirect(`/login?error=1&next=${encodeURIComponent(next)}&hint=no-password-env`);
   }
-  if (!constantTimeEqual(password, process.env.AGENTFORGE_PASSWORD)) {
+  if (!constantTimeEqual(password, process.env.AGENTFLOW_PASSWORD)) {
     record({ action: "auth.fail", entity: "session", payload: { reason: "legacy-password-mismatch" } });
     await sleep(1500);
     return redirect(`/login?error=1&next=${encodeURIComponent(next)}`);
@@ -99,7 +99,7 @@ async function login(formData: FormData) {
   // Last-resort: no users yet, no admin row — issue a session with sub=0 so
   // middleware approves but no user record exists. This shouldn't happen in
   // practice because bootstrap runs eagerly, but it keeps the login UX honest
-  // for ops who set AGENTFORGE_PASSWORD AFTER the first page load.
+  // for ops who set AGENTFLOW_PASSWORD AFTER the first page load.
   await setSessionLegacyNoUser();
   record({ action: "auth.login", entity: "session", payload: { mode: "legacy-no-user" } });
   return redirect(next);
@@ -203,7 +203,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
   const hint = searchParams?.hint;
   const stage = searchParams?.stage === "totp" && cookies().get(PENDING_2FA_COOKIE) ? "totp" : "password";
   const isEmptyDB = usersRepo.count() === 0;
-  const hasEnvPassword = !!process.env.AGENTFORGE_PASSWORD;
+  const hasEnvPassword = !!process.env.AGENTFLOW_PASSWORD;
   // Surface role/user info to help operators understand the deployment state
   const builtinRoles = rolesRepo.list().filter((r) => r.is_system === 1);
 
@@ -251,7 +251,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-accent-500 font-bold text-forge">AF</div>
           <div>
-            <div className="text-base font-semibold text-ink-50">AgentForge</div>
+            <div className="text-base font-semibold text-ink-50">AgentFlow</div>
             <div className="text-xs text-forge-muted">智造工坊 · v0.4</div>
           </div>
         </div>
@@ -282,7 +282,7 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
           {error ? (
             <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
               {hint === "no-password-env"
-                ? "服务器未配置 AGENTFORGE_PASSWORD，且账户不存在。"
+                ? "服务器未配置 AGENTFLOW_PASSWORD，且账户不存在。"
                 : hint === "rate-limited"
                 ? "登录请求过于频繁，请 15 分钟后再试。"
                 : hint === "locked-out"
@@ -303,11 +303,11 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
           </p>
           {hasEnvPassword ? (
             <p>
-              💡 兼容模式：留空邮箱并输入 <code className="text-accent-300">AGENTFORGE_PASSWORD</code> 也可登录（owner 身份）。
+              💡 兼容模式：留空邮箱并输入 <code className="text-accent-300">AGENTFLOW_PASSWORD</code> 也可登录（owner 身份）。
             </p>
           ) : (
             <p className="text-amber-300">
-              ⚠️ 未设置 <code>AGENTFORGE_PASSWORD</code>，首次登录前请在 <code>.env.local</code> 中配置。
+              ⚠️ 未设置 <code>AGENTFLOW_PASSWORD</code>，首次登录前请在 <code>.env.local</code> 中配置。
             </p>
           )}
         </div>

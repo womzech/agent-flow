@@ -19,7 +19,7 @@ export interface CurrentUser {
  * Resolve the logged-in user for the current request.
  *
  * Two sources, in order:
- *  1. The `x-agentforge-user-id` header (set by middleware after verifying
+ *  1. The `x-agentflow-user-id` header (set by middleware after verifying
  *     the session cookie). This is the hot path during normal navigation.
  *  2. Decoding the cookie ourselves. Falls back when the middleware doesn't
  *     run (e.g. in server-action subrequests that bypass matcher rules in
@@ -50,7 +50,7 @@ export const currentUser = cache(async (): Promise<CurrentUser | null> => {
   // 2) Header set by middleware after verifying session cookie.
   if (!userId) {
     try {
-      const hdr = headers().get("x-agentforge-user-id");
+      const hdr = headers().get("x-agentflow-user-id");
       if (hdr) userId = Number(hdr);
     } catch { /* see above */ }
   }

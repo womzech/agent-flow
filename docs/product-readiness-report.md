@@ -1,4 +1,4 @@
-# AgentForge 产品上线就绪度评估报告
+# AgentFlow 产品上线就绪度评估报告
 
 > **版本**：v0.4.0
 > **报告日期**：2026-05-14
@@ -37,7 +37,7 @@
 
 ### 1.1 产品定义
 
-AgentForge / 智造工坊是为 **AI Agent 独立顾问 / 小型团队（1-5 人）** 设计的「销售 → 设计 → 开发 → 交付」一体化工作台。源自《创业产品现金流评估研究报告》方向 G：**中小企业 AI Agent 定制实施服务**（项目费 ¥30,000-100,000，1-3 周交付）。
+AgentFlow / 智造工坊是为 **AI Agent 独立顾问 / 小型团队（1-5 人）** 设计的「销售 → 设计 → 开发 → 交付」一体化工作台。源自《创业产品现金流评估研究报告》方向 G：**中小企业 AI Agent 定制实施服务**（项目费 ¥30,000-100,000，1-3 周交付）。
 
 ### 1.2 目标客户
 
@@ -170,7 +170,7 @@ npm test
 - ✅ 启动：`npm run dev` 1 秒内 ready
 - ✅ 公开页面：`/login`、`/api/health`、`/api/wecom/callback`、`/share/<token>` 全部返回正常
 - ✅ 受保护页面：`/`、`/leads`、`/users`、`/security/*`、`/api-tokens` 全部 307→`/login`
-- ✅ Bootstrap：`AGENTFORGE_PASSWORD=xxx` 启动后自动创建 `admin@local` / owner
+- ✅ Bootstrap：`AGENTFLOW_PASSWORD=xxx` 启动后自动创建 `admin@local` / owner
 - ✅ CSRF cookie 自动签发：首次访问任意页面，response 设置 `csrf_token=<payload>.<sig>`
 - ✅ Logout GET 返回 405（CSRF 漂移防护）
 - ✅ WeCom URL 验证：合法签名 → 200 plaintext echostr；非法签名 → 400
@@ -223,7 +223,7 @@ npm run build       # ✓ 44 routes + 27.5 kB middleware
 
 | 模式 | 适用场景 | 配置 | 安全等级 |
 |---|---|---|---|
-| **A. 单人本机** | 顾问自用、初期验证 | 不设 `AGENTFORGE_PASSWORD` | 开放模式（仅 localhost） |
+| **A. 单人本机** | 顾问自用、初期验证 | 不设 `AGENTFLOW_PASSWORD` | 开放模式（仅 localhost） |
 | **B. 小团队 VPS** | 3-10 人远程协作 | 设密码 + 启用 2FA + HTTPS | 推荐生产基线 |
 | **C. 客户友好 PoC** | 服务于第一批客户的演示 | 模式 B + WeCom 接入 | 演示级 |
 
@@ -231,14 +231,14 @@ npm run build       # ✓ 44 routes + 27.5 kB middleware
 
 | 变量 | 必填 | 说明 |
 |---|---|---|
-| `AGENTFORGE_PASSWORD` | 模式 B/C | Bootstrap admin@local 密码；同时作为 session HMAC 默认密钥 |
-| `AGENTFORGE_SESSION_SECRET` | 推荐 | 独立 session 签名密钥（生产强烈建议设置） |
-| `AGENTFORGE_DB` | 否 | SQLite 文件路径（默认 `data/agentforge.db`） |
+| `AGENTFLOW_PASSWORD` | 模式 B/C | Bootstrap admin@local 密码；同时作为 session HMAC 默认密钥 |
+| `AGENTFLOW_SESSION_SECRET` | 推荐 | 独立 session 签名密钥（生产强烈建议设置） |
+| `AGENTFLOW_DB` | 否 | SQLite 文件路径（默认 `data/agent-flow.db`） |
 | `ANTHROPIC_API_KEY` | 否（无则用 fallback） | Claude API key |
 | `ANTHROPIC_MODEL` | 否 | 默认 `claude-sonnet-4-6` |
 | `WECOM_CORP_ID` 等 5 项 | 否（缺失则降级） | 企微自建应用配置 |
 | `WECOM_DEFAULT_NOTIFY_USERS` | 否 | 主动推送默认对象（`@all` / `userid\|userid`） |
-| `AGENTFORGE_CONSULTANT_NAME` 等 | 否 | 注入诊断报告署名 |
+| `AGENTFLOW_CONSULTANT_NAME` 等 | 否 | 注入诊断报告署名 |
 | `NEXT_PUBLIC_BASE_URL` | 否 | logout 等地方拼回跳 URL |
 
 ### 5.3 升级路径
@@ -247,10 +247,10 @@ npm run build       # ✓ 44 routes + 27.5 kB middleware
 |---|---|---|
 | 无 → v0.4 | 全新部署，`npm install && npm run dev` | 低 |
 | v0.1 → v0.4 | 重启即可，schema 自动升级到 v4 | 低（向后兼容） |
-| v0.2 → v0.4 | 重启即可；用户从 `AGENTFORGE_PASSWORD` 自动 bootstrap | 低 |
+| v0.2 → v0.4 | 重启即可；用户从 `AGENTFLOW_PASSWORD` 自动 bootstrap | 低 |
 | v0.3 → v0.4 | 重启即可；现有 session cookie 因 jti 缺失需重新登录 | **中**（一次性踢出） |
 
-**降级路径**：不支持。schema 不会自动 downgrade。如需回滚，从备份恢复 `data/agentforge.db`。
+**降级路径**：不支持。schema 不会自动 downgrade。如需回滚，从备份恢复 `data/agent-flow.db`。
 
 ### 5.4 系统要求
 
@@ -313,7 +313,7 @@ npm run build       # ✓ 44 routes + 27.5 kB middleware
 | API 滥用 | Rate limit + PAT 可撤销 + audit | PAT 当前继承用户全部角色权限，无 scope 收窄 |
 | 凭证存储 | PBKDF2-SHA256 100k iter + 32B random salt | 未升级到 argon2id（需引入依赖） |
 | 2FA 被绕过 | TOTP 强制在 totp_enabled=1 时必走两步 + 5 分钟 pending cookie + 5/5min rate limit | 用户禁用 2FA 后无法被强制重新启用（管理员需手动） |
-| 数据库直接被读 | `data/agentforge.db` 文件系统权限 | 没有应用层加密；磁盘加密由运维负责 |
+| 数据库直接被读 | `data/agent-flow.db` 文件系统权限 | 没有应用层加密；磁盘加密由运维负责 |
 | WeCom 回调伪造 | 4-tuple SHA1 签名 + corpid 校验 + 100/min global rate limit | 同 corpid 内其他应用理论上能伪造（需企微管理员配合） |
 | LLM Prompt injection | 企微意图路由把权限明确告诉 Claude，超出范围回 explain refusal | 攻击者诱导 Claude 输出敏感数据（仅返回当前用户已可见数据） |
 
@@ -327,7 +327,7 @@ npm run build       # ✓ 44 routes + 27.5 kB middleware
 
 ### 7.3 合规
 
-- **GDPR / PIPL**：用户数据全部存在客户自有 SQLite 文件，AgentForge 不上传任何业务数据到第三方（除非客户主动启用 Anthropic / 企微）。
+- **GDPR / PIPL**：用户数据全部存在客户自有 SQLite 文件，AgentFlow 不上传任何业务数据到第三方（除非客户主动启用 Anthropic / 企微）。
 - **等保 / SOC2**：**未经过审计**，不建议在该等级要求的环境部署。
 - **PCI**：不处理信用卡数据。
 - **HIPAA**：不适合，仅供商业 CRM 使用。

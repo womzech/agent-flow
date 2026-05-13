@@ -2,7 +2,7 @@
  * Intent router for inbound WeCom messages.
  *
  * Pipeline:
- *   1. Map wecom_userid → AgentForge User (via users.wecom_userid). If
+ *   1. Map wecom_userid → AgentFlow User (via users.wecom_userid). If
  *      unbound: short, polite "please ask admin to link your account" reply.
  *   2. If text starts with "/": parse as slash command, dispatch.
  *   3. Else: ask Claude to classify the natural-language request into a
@@ -33,7 +33,7 @@ export interface IntentResult {
   command: string;
 }
 
-/** Resolve the WeCom sender to an AgentForge user + their permissions. */
+/** Resolve the WeCom sender to an AgentFlow user + their permissions. */
 export function resolveSender(wecomUserid: string): RouterContext {
   const user = usersRepo.getByWecomUserid(wecomUserid) ?? null;
   if (!user || user.status !== "active") {
@@ -43,7 +43,7 @@ export function resolveSender(wecomUserid: string): RouterContext {
 }
 
 const HELP = [
-  "**AgentForge 企业微信指令**",
+  "**AgentFlow 企业微信指令**",
   "",
   "- `/help` 显示本帮助",
   "- `/me` 显示我的账号 / 角色 / 权限",
@@ -53,7 +53,7 @@ const HELP = [
   "- `/diag <关键词>` 搜索诊断报告",
   "- 直接输入中文问题（如「越达玩具最近怎么样？」）将由 AI 帮你查询。",
   "",
-  "⚠️ 未绑定 AgentForge 账号的用户只能用 `/help` 和 `/me`。",
+  "⚠️ 未绑定 AgentFlow 账号的用户只能用 `/help` 和 `/me`。",
 ].join("\n");
 
 /**
@@ -114,7 +114,7 @@ async function dispatchCommand(text: string, ctx: RouterContext, msg: IncomingMe
 function requireBound(ctx: RouterContext) {
   if (!ctx.user) {
     throw new IntentError(
-      "你的企业微信账号尚未绑定 AgentForge 用户。\n\n请联系管理员在 `/users` 页面把你的 wecom_userid 添加到对应账号。",
+      "你的企业微信账号尚未绑定 AgentFlow 用户。\n\n请联系管理员在 `/users` 页面把你的 wecom_userid 添加到对应账号。",
     );
   }
 }
@@ -136,7 +136,7 @@ function renderMe(ctx: RouterContext, msg: IncomingMessage): string {
       "",
       `企业微信 userid: \`${msg.fromUserName}\``,
       "",
-      "请联系管理员在 `/users` 页把这个 userid 添加到你的 AgentForge 账号。",
+      "请联系管理员在 `/users` 页把这个 userid 添加到你的 AgentFlow 账号。",
     ].join("\n");
   }
   const perms = Array.from(ctx.permissions).sort();
@@ -217,8 +217,8 @@ async function dispatchNaturalLanguage(text: string, ctx: RouterContext, msg: In
   const permList = Array.from(ctx.permissions).sort().join(", ") || "（无权限）";
 
   const system = [
-    "你是 AgentForge 企业微信交互助手。用户在企微里发了一条中文消息。",
-    "你要把这条消息映射到一个 AgentForge 命令，并以严格的 JSON 输出。",
+    "你是 AgentFlow 企业微信交互助手。用户在企微里发了一条中文消息。",
+    "你要把这条消息映射到一个 AgentFlow 命令，并以严格的 JSON 输出。",
     "",
     "可用命令：",
     "- /help",

@@ -1,7 +1,7 @@
 /**
  * Lightweight single-tenant auth.
  *
- * Why not NextAuth / Lucia / iron-session? — AgentForge v0.2 is still a
+ * Why not NextAuth / Lucia / iron-session? — AgentFlow v0.2 is still a
  * single-consultant workbench. Adding a full auth library would triple our
  * surface area and require sessions persisted to DB. Instead we use a signed
  * cookie that any Edge / Node runtime can verify with one HMAC. When the
@@ -15,7 +15,7 @@
  *  - XSS exfiltration → cookie is HTTP-only, JS cannot read it.
  */
 
-export const SESSION_COOKIE = "agentforge_session";
+export const SESSION_COOKIE = "agentflow_session";
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 function b64url(buf: Uint8Array): string {
@@ -34,8 +34,8 @@ function b64urlDecode(s: string): Uint8Array {
 }
 
 function getSecret(): string {
-  const secret = process.env.AGENTFORGE_SESSION_SECRET || process.env.AGENTFORGE_PASSWORD;
-  if (!secret) throw new Error("AGENTFORGE_PASSWORD (and optionally AGENTFORGE_SESSION_SECRET) must be set");
+  const secret = process.env.AGENTFLOW_SESSION_SECRET || process.env.AGENTFLOW_PASSWORD;
+  if (!secret) throw new Error("AGENTFLOW_PASSWORD (and optionally AGENTFLOW_SESSION_SECRET) must be set");
   return secret;
 }
 

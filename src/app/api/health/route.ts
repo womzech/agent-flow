@@ -3,7 +3,7 @@ import { getDb, appliedMigrations } from "@/lib/db";
 import { SCHEMA_VERSION } from "@/lib/schema";
 
 const STARTED_AT = new Date().toISOString();
-const BUILD_SHA = process.env.AGENTFORGE_BUILD_SHA || "dev";
+const BUILD_SHA = process.env.AGENTFLOW_BUILD_SHA || "dev";
 
 export async function GET() {
   const checks: Record<string, { ok: boolean; detail?: string }> = {};
@@ -30,7 +30,7 @@ export async function GET() {
   checks.anthropic_key = { ok: !!process.env.ANTHROPIC_API_KEY, detail: process.env.ANTHROPIC_API_KEY ? "set" : "missing (fallback mode)" };
 
   // Auth posture
-  checks.auth = { ok: !!process.env.AGENTFORGE_PASSWORD, detail: process.env.AGENTFORGE_PASSWORD ? "enabled" : "OPEN MODE (dev only)" };
+  checks.auth = { ok: !!process.env.AGENTFLOW_PASSWORD, detail: process.env.AGENTFLOW_PASSWORD ? "enabled" : "OPEN MODE (dev only)" };
 
   const allOk = Object.values(checks).every((c) => c.ok);
 

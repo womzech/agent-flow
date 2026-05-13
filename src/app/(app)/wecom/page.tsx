@@ -37,7 +37,7 @@ export default async function WecomAdminPage() {
         </Card>
       </Section>
 
-      <Section title={`已绑定用户（${bound.length}）`} description="企业微信 userid ↔ AgentForge user 的映射；在 /users/[id] 编辑">
+      <Section title={`已绑定用户（${bound.length}）`} description="企业微信 userid ↔ AgentFlow user 的映射；在 /users/[id] 编辑">
         {bound.length === 0 ? (
           <EmptyState title="还没有用户绑定企业微信 userid" description="去 /users/[id] 编辑账号，填入 wecom_userid 字段。" />
         ) : (
@@ -46,7 +46,7 @@ export default async function WecomAdminPage() {
               <thead>
                 <tr className="border-b border-forge-line/60 text-left text-xs uppercase tracking-wider text-forge-muted">
                   <th className="p-3">姓名</th>
-                  <th className="p-3">AgentForge 邮箱</th>
+                  <th className="p-3">AgentFlow 邮箱</th>
                   <th className="p-3">企业微信 userid</th>
                   <th className="p-3">角色</th>
                   <th className="p-3">最近登录</th>

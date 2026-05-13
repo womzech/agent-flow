@@ -120,10 +120,10 @@ export function verify(secret: Buffer, code: string, params: TotpParams = {}): b
 }
 
 export function otpauthUri(opts: { email: string; secretBase32: string; issuer?: string }): string {
-  const label = encodeURIComponent(`${opts.issuer ?? "AgentForge"}:${opts.email}`);
+  const label = encodeURIComponent(`${opts.issuer ?? "AgentFlow"}:${opts.email}`);
   const params = new URLSearchParams({
     secret: opts.secretBase32.replace(/=+$/g, ""),
-    issuer: opts.issuer ?? "AgentForge",
+    issuer: opts.issuer ?? "AgentFlow",
     digits: String(DIGITS),
     period: String(STEP_SECONDS),
     algorithm: "SHA1",

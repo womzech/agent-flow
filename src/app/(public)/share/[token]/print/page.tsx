@@ -10,10 +10,10 @@ export default function PrintDiagnosticPage({ params }: { params: { token: strin
   if (!d || !d.report_markdown) notFound();
 
   const settings = settingsRepo.all();
-  const consultantName = settings.consultant_name || process.env.AGENTFORGE_CONSULTANT_NAME || "AI 工作流顾问";
-  const consultantTitle = settings.consultant_title || process.env.AGENTFORGE_CONSULTANT_TITLE || "AI 工作流顾问";
-  const consultantPhone = settings.consultant_phone || process.env.AGENTFORGE_CONSULTANT_PHONE || "";
-  const consultantEmail = settings.consultant_email || process.env.AGENTFORGE_CONSULTANT_EMAIL || "";
+  const consultantName = settings.consultant_name || process.env.AGENTFLOW_CONSULTANT_NAME || "AI 工作流顾问";
+  const consultantTitle = settings.consultant_title || process.env.AGENTFLOW_CONSULTANT_TITLE || "AI 工作流顾问";
+  const consultantPhone = settings.consultant_phone || process.env.AGENTFLOW_CONSULTANT_PHONE || "";
+  const consultantEmail = settings.consultant_email || process.env.AGENTFLOW_CONSULTANT_EMAIL || "";
 
   return (
     <div className="print-doc">
@@ -52,7 +52,7 @@ export default function PrintDiagnosticPage({ params }: { params: { token: strin
       </div>
       <div className="header">
         <div>
-          <div className="brand">AgentForge · 智造工坊</div>
+          <div className="brand">AgentFlow · 智造工坊</div>
           <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>{d.title}</div>
         </div>
         <div className="meta">

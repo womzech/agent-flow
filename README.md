@@ -1,8 +1,8 @@
-# AgentForge · 智造工坊
+# AgentFlow · 智造工坊
 
 > 面向 AI Agent 独立顾问 / 小型团队的「销售 → 设计 → 开发 → 交付」一体化工作台。
 >
-> 灵感来自《创业产品现金流评估研究报告》中**方向 G — 企业 AI Agent 定制实施服务**：中小企业愿意为「省一个员工」的具体工作流自动化付费 3 万 - 10 万元，但顾问端需要能 1-3 周交付、可复用、可标准化报价的工具链。AgentForge 把这套打法变成可日用的软件。
+> 灵感来自《创业产品现金流评估研究报告》中**方向 G — 企业 AI Agent 定制实施服务**：中小企业愿意为「省一个员工」的具体工作流自动化付费 3 万 - 10 万元，但顾问端需要能 1-3 周交付、可复用、可标准化报价的工具链。AgentFlow 把这套打法变成可日用的软件。
 
 ## 为什么做这个
 
@@ -13,9 +13,9 @@
 - 长期不被「项目制陷阱」拖死的关键是**把每次交付沉淀为可复用模板**。
 - 销售路径是 **demo 驱动**：一个能展示「改造前 vs 改造后」的视频或现场演示，胜过任何 PPT。
 
-AgentForge 围绕这四点，把顾问每天要做的事情结构化：
+AgentFlow 围绕这四点，把顾问每天要做的事情结构化：
 
-| 顾问的日常 | 没有 AgentForge | 有了 AgentForge |
+| 顾问的日常 | 没有 AgentFlow | 有了 AgentFlow |
 |---|---|---|
 | 线索进来 | 微信里散落 | 进入 Lead Pipeline，按阶段流转 |
 | 跟客户做诊断 | Word 文档手写 | 在线问卷 → Claude 生成结构化诊断报告 |
@@ -68,11 +68,11 @@ AgentForge 围绕这四点，把顾问每天要做的事情结构化：
 ## 快速开始
 
 ```bash
-git clone git@github.com:womzech/agentforge.git
-cd agentforge
+git clone git@github.com:womzech/agent-flow.git
+cd agent-flow
 npm install
 cp .env.example .env.local
-# 在 .env.local 至少填入 AGENTFORGE_PASSWORD（启用鉴权）
+# 在 .env.local 至少填入 AGENTFLOW_PASSWORD（启用鉴权）
 # 可选：ANTHROPIC_API_KEY（不配则诊断走本地占位模板）
 npm run seed          # 初始化数据库 + 种子数据
 npm run dev           # 启动 http://localhost:3000

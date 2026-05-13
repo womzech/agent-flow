@@ -1,5 +1,5 @@
 /**
- * Single source of truth for the AgentForge SQLite schema.
+ * Single source of truth for the AgentFlow SQLite schema.
  *
  * CHANGELOG
  *  - v1 (2026-05-13): Initial schema (leads, clients, diagnostics, projects, blueprints,

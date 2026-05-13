@@ -1,8 +1,8 @@
-# AgentForge AGOS-style registry. Values are placeholders until tooling (e.g.
+# AgentFlow AGOS-style registry. Values are placeholders until tooling (e.g.
 # ../agent-governance/scripts/agos_doctor.py) updates them. This file is read
-# by AGOS scripts; AgentForge itself does not require it to run.
+# by AGOS scripts; AgentFlow itself does not require it to run.
 version: 1
-repo: agentforge
+repo: agent-flow
 sessions: []
 default_agents:
   claude: { installed: unknown }

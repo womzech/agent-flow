@@ -47,7 +47,7 @@ describe("wecom/intent: slash command dispatch", () => {
   it("/help works for unbound users", async () => {
     const r = await dispatchIntent(buildMsg("/help"));
     assert.equal(r.command, "help");
-    assert.equal(r.reply.includes("AgentForge"), true);
+    assert.equal(r.reply.includes("AgentFlow"), true);
   });
 
   it("/me reports unbound state when wecom_userid has no user row", async () => {

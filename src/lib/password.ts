@@ -2,7 +2,7 @@
  * Password hashing for the multi-user RBAC layer.
  *
  * We use PBKDF2-SHA256 via the WebCrypto SubtleCrypto API for two reasons:
- *  - Available in every runtime AgentForge supports (Edge / Node / tests).
+ *  - Available in every runtime AgentFlow supports (Edge / Node / tests).
  *  - Zero new dependencies; argon2/bcrypt would require native bindings.
  *
  * Parameters are stored alongside each user row (`password_iter`) so we can

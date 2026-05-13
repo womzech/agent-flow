@@ -47,7 +47,7 @@ export default async function ApiTokensPage({ searchParams }: { searchParams: { 
         <Card className="border-amber-500/40 bg-amber-500/5">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-300">⚠️ 仅显示一次</div>
           <div className="mb-3 text-sm text-ink-100">
-            请立刻复制保存。关闭此页后，AgentForge 无法再次显示此 token 的明文 — 只能在密钥管理软件中找回，或撤销重建。
+            请立刻复制保存。关闭此页后，AgentFlow 无法再次显示此 token 的明文 — 只能在密钥管理软件中找回，或撤销重建。
           </div>
           <pre className="overflow-x-auto rounded-md border border-amber-500/30 bg-forge p-3 text-sm text-amber-200">
             {justCreated}

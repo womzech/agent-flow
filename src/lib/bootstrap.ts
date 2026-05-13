@@ -2,7 +2,7 @@
  * One-shot bootstrap that runs on every `getDb()` call (cheaply idempotent):
  *  1. Ensures the 22 built-in permissions exist.
  *  2. Ensures the 4 built-in roles exist with their grants.
- *  3. If `users` is empty AND `AGENTFORGE_PASSWORD` is set, creates
+ *  3. If `users` is empty AND `AGENTFLOW_PASSWORD` is set, creates
  *     `admin@local` with the `owner` role using that password (so v0.2
  *     deployments upgrade in place without ops intervention).
  *
@@ -49,10 +49,10 @@ function seedPermissionsAndRoles() {
 
 async function ensureAdminUser() {
   if (usersRepo.count() > 0) return;
-  const password = process.env.AGENTFORGE_PASSWORD;
+  const password = process.env.AGENTFLOW_PASSWORD;
   if (!password) {
     // No password set → leave users table empty; login page will show a
-    // "set AGENTFORGE_PASSWORD and restart" hint.
+    // "set AGENTFLOW_PASSWORD and restart" hint.
     return;
   }
   const owner = rolesRepo.getByName("owner");
@@ -61,7 +61,7 @@ async function ensureAdminUser() {
   const hashed = await hashPassword(password);
   const u = usersRepo.create({
     email: "admin@local",
-    name: process.env.AGENTFORGE_CONSULTANT_NAME || "Admin",
+    name: process.env.AGENTFLOW_CONSULTANT_NAME || "Admin",
     wecom_userid: null,
     role_id: owner.id,
     ...hashed,

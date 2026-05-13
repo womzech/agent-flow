@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const d = deliverablesRepo.get(id);
   if (!d) return NextResponse.json({ error: "deliverable not found" }, { status: 404 });
 
-  const userId = req.headers.get("x-agentforge-user-id") || ipFromHeaders(req.headers);
+  const userId = req.headers.get("x-agentflow-user-id") || ipFromHeaders(req.headers);
   const rl = consume({ route: "deliverable-bundle", key: userId, limit: 30, windowMs: 60 * 60 * 1000 });
   if (!rl.ok) {
     const res = NextResponse.json(

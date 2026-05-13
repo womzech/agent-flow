@@ -1,5 +1,5 @@
 /**
- * Outbound event notifications: AgentForge → WeCom.
+ * Outbound event notifications: AgentFlow → WeCom.
  *
  * Designed to be called from server actions and API routes immediately after
  * the corresponding audit `record()` call. Failures NEVER throw — they get

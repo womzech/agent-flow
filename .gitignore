@@ -26,7 +26,7 @@ dist/
 .env*.local
 .env
 
-# AgentForge runtime data
+# AgentFlow runtime data
 data/
 !data/.gitkeep
 

@@ -68,7 +68,7 @@ export async function Sidebar() {
       <Link href="/" className="mb-8 flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent-500 font-bold text-forge">AF</div>
         <div className="leading-tight">
-          <div className="font-semibold text-ink-50">AgentForge</div>
+          <div className="font-semibold text-ink-50">AgentFlow</div>
           <div className="text-xs text-forge-muted">智造工坊 · v0.3</div>
         </div>
       </Link>

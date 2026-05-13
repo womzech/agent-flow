@@ -39,8 +39,8 @@ describe("templates", () => {
   });
 
   it("renderTemplate substitutes placeholders", () => {
-    const r = renderTemplate("Hello {{name}}, your project is {{proj}}.", { name: "Lou", proj: "AgentForge" });
-    assert.equal(r, "Hello Lou, your project is AgentForge.");
+    const r = renderTemplate("Hello {{name}}, your project is {{proj}}.", { name: "Lou", proj: "AgentFlow" });
+    assert.equal(r, "Hello Lou, your project is AgentFlow.");
   });
 
   it("renderTemplate leaves unknown placeholders untouched", () => {

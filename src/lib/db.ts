@@ -3,12 +3,12 @@ import { mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { SCHEMA_SQL, SCHEMA_VERSION } from "./schema";
 
-const DB_PATH = process.env.AGENTFORGE_DB
-  ? resolve(process.cwd(), process.env.AGENTFORGE_DB)
-  : resolve(process.cwd(), "data/agentforge.db");
+const DB_PATH = process.env.AGENTFLOW_DB
+  ? resolve(process.cwd(), process.env.AGENTFLOW_DB)
+  : resolve(process.cwd(), "data/agent-flow.db");
 
 // Cache the DB on globalThis so Next.js hot reloads don't open dozens of handles.
-const globalForDb = globalThis as unknown as { __agentforgeDb?: Database.Database };
+const globalForDb = globalThis as unknown as { __agentflowDb?: Database.Database };
 
 function open() {
   const dir = dirname(DB_PATH);
@@ -47,8 +47,8 @@ export function appliedMigrations(): { version: number; applied_at: string }[] {
 }
 
 export function getDb(): Database.Database {
-  if (!globalForDb.__agentforgeDb) {
-    globalForDb.__agentforgeDb = open();
+  if (!globalForDb.__agentflowDb) {
+    globalForDb.__agentflowDb = open();
     // Fire-and-forget RBAC bootstrap. We deliberately don't await here so
     // tests / non-RBAC code paths don't pay the password-hashing latency
     // (~100ms) on first call. `ensureBootstrapped()` is idempotent.
@@ -56,7 +56,7 @@ export function getDb(): Database.Database {
       .then((m) => m.ensureBootstrapped())
       .catch((err) => console.error("[db] bootstrap deferred error", err));
   }
-  return globalForDb.__agentforgeDb;
+  return globalForDb.__agentflowDb;
 }
 
 /**
@@ -78,8 +78,8 @@ export function withTransaction<T>(fn: (db: Database.Database) => T): T {
 }
 
 export function closeDb() {
-  if (globalForDb.__agentforgeDb) {
-    globalForDb.__agentforgeDb.close();
-    globalForDb.__agentforgeDb = undefined;
+  if (globalForDb.__agentflowDb) {
+    globalForDb.__agentflowDb.close();
+    globalForDb.__agentflowDb = undefined;
   }
 }

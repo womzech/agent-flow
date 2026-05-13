@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!d) return NextResponse.json({ error: "diagnostic not found" }, { status: 404 });
 
   // Cap LLM spend: 10 generations / hour per session/IP.
-  const userId = req.headers.get("x-agentforge-user-id") || ipFromHeaders(req.headers);
+  const userId = req.headers.get("x-agentflow-user-id") || ipFromHeaders(req.headers);
   const rl = consume({ route: "ai-generate", key: userId, limit: 10, windowMs: 60 * 60 * 1000 });
   if (!rl.ok) {
     const res = NextResponse.json(

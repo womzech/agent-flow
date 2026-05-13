@@ -7,7 +7,7 @@ export async function Topbar() {
   return (
     <header className="flex h-14 items-center justify-between border-b border-forge-line bg-forge-panel/40 px-6">
       <div className="flex items-center gap-4 text-sm text-forge-muted">
-        <span className="lg:hidden font-semibold text-ink-50">AgentForge</span>
+        <span className="lg:hidden font-semibold text-ink-50">AgentFlow</span>
         <form action="/search" method="get" className="hidden lg:block">
           <input
             type="search"

@@ -1,7 +1,7 @@
 /**
  * Single-process token-bucket rate limiter.
  *
- * Why in-memory: AgentForge runs as a single Next.js process per deployment.
+ * Why in-memory: AgentFlow runs as a single Next.js process per deployment.
  * Multi-replica deployments are out of scope for v0.4. The bucket store is
  * exposed behind an injectable `now()` so tests stay deterministic.
  *

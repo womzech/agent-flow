@@ -10,8 +10,8 @@ import { join } from "node:path";
 let tmpDir: string | null = null;
 
 export function withTempDb(): { dispose: () => void } {
-  tmpDir = mkdtempSync(join(tmpdir(), "agentforge-test-"));
-  process.env.AGENTFORGE_DB = join(tmpDir, "test.db");
+  tmpDir = mkdtempSync(join(tmpdir(), "agent-flow-test-"));
+  process.env.AGENTFLOW_DB = join(tmpDir, "test.db");
   return {
     dispose() {
       try {

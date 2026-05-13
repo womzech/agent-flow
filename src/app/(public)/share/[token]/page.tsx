@@ -12,7 +12,7 @@ export default function SharedDiagnosticPage({ params }: { params: { token: stri
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
       <div className="mb-2 flex items-center justify-between text-xs text-forge-muted">
-        <span>由 AgentForge / 智造工坊 出具</span>
+        <span>由 AgentFlow / 智造工坊 出具</span>
         <span>
           生成于 {fmtDate(d.generated_at)} ·{" "}
           <a href={`/share/${params.token}/print`} className="text-accent-400 hover:underline">

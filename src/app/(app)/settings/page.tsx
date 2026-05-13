@@ -64,10 +64,10 @@ export default function SettingsPage({ searchParams }: { searchParams: { saved?:
       <Section title="顾问署名">
         <Card>
           <form action={saveSettings} className="grid gap-3 md:grid-cols-2">
-            <Field label="姓名"><Input name="consultant_name" defaultValue={all.consultant_name ?? process.env.AGENTFORGE_CONSULTANT_NAME ?? ""} /></Field>
-            <Field label="职位"><Input name="consultant_title" defaultValue={all.consultant_title ?? process.env.AGENTFORGE_CONSULTANT_TITLE ?? "AI 工作流顾问"} /></Field>
-            <Field label="电话"><Input name="consultant_phone" defaultValue={all.consultant_phone ?? process.env.AGENTFORGE_CONSULTANT_PHONE ?? ""} /></Field>
-            <Field label="邮箱"><Input name="consultant_email" defaultValue={all.consultant_email ?? process.env.AGENTFORGE_CONSULTANT_EMAIL ?? ""} /></Field>
+            <Field label="姓名"><Input name="consultant_name" defaultValue={all.consultant_name ?? process.env.AGENTFLOW_CONSULTANT_NAME ?? ""} /></Field>
+            <Field label="职位"><Input name="consultant_title" defaultValue={all.consultant_title ?? process.env.AGENTFLOW_CONSULTANT_TITLE ?? "AI 工作流顾问"} /></Field>
+            <Field label="电话"><Input name="consultant_phone" defaultValue={all.consultant_phone ?? process.env.AGENTFLOW_CONSULTANT_PHONE ?? ""} /></Field>
+            <Field label="邮箱"><Input name="consultant_email" defaultValue={all.consultant_email ?? process.env.AGENTFLOW_CONSULTANT_EMAIL ?? ""} /></Field>
             <div className="md:col-span-2 flex justify-end">
               <button type="submit" className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-forge hover:bg-accent-400">
                 保存

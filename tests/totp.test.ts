@@ -98,7 +98,7 @@ describe("totp: generateSecret + otpauthUri", () => {
     const s = generateSecret();
     const uri = otpauthUri({ email: "user@example.com", secretBase32: s.base32 });
     assert.equal(uri.startsWith("otpauth://totp/"), true);
-    assert.ok(uri.includes("issuer=AgentForge"));
+    assert.ok(uri.includes("issuer=AgentFlow"));
     assert.ok(uri.includes("algorithm=SHA1"));
     assert.ok(uri.includes("digits=6"));
     assert.ok(uri.includes("period=30"));

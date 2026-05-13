@@ -2,8 +2,8 @@ id: MVP-001
 priority: P0
 status: completed
 owner_agent: claude
-repo: agentforge
-title: Build AgentForge v0.1 MVP — sales / design / development / delivery workbench
+repo: agent-flow
+title: Build AgentFlow v0.1 MVP — sales / design / development / delivery workbench
 scope:
   - Next.js 14 App Router + TypeScript + Tailwind + better-sqlite3 + Anthropic SDK skeleton.
   - Schema and repo layer for leads / clients / diagnostics / projects / blueprints / templates / deliverables / tickets / revenue.

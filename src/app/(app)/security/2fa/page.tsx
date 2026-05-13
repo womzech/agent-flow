@@ -106,7 +106,7 @@ export default async function TwoFaPage({ searchParams }: { searchParams: { erro
           <Card>
             <form action={startEnroll}>
               <p className="mb-3 text-sm text-ink-200">
-                点击下面的按钮后，AgentForge 会生成一个 20 字节随机 secret。请用 Google Authenticator / Microsoft Authenticator / 1Password / Bitwarden 等 TOTP 客户端扫描或粘贴 URI 完成绑定。
+                点击下面的按钮后，AgentFlow 会生成一个 20 字节随机 secret。请用 Google Authenticator / Microsoft Authenticator / 1Password / Bitwarden 等 TOTP 客户端扫描或粘贴 URI 完成绑定。
               </p>
               <button type="submit" className="rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-forge hover:bg-accent-400">
                 生成 secret 并开始
@@ -151,7 +151,7 @@ export default async function TwoFaPage({ searchParams }: { searchParams: { erro
                 </button>
               </form>
               <p className="mt-2 text-xs text-forge-muted">
-                如果输错或超时，输入下一个验证码即可重试。AgentForge 接受当前 30 秒窗口前后各 1 个 token（±60 秒容忍时钟漂移）。
+                如果输错或超时，输入下一个验证码即可重试。AgentFlow 接受当前 30 秒窗口前后各 1 个 token（±60 秒容忍时钟漂移）。
               </p>
             </Card>
           </Section>

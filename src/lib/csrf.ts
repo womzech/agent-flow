@@ -27,7 +27,7 @@ import { createHash, createHmac, randomBytes } from "node:crypto";
 const COOKIE = "csrf_token";
 
 function secret(): string {
-  return process.env.AGENTFORGE_SESSION_SECRET || process.env.AGENTFORGE_PASSWORD || "agentforge-default-csrf-secret";
+  return process.env.AGENTFLOW_SESSION_SECRET || process.env.AGENTFLOW_PASSWORD || "agent-flow-default-csrf-secret";
 }
 
 function sign(payload: string): string {

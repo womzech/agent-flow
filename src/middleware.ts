@@ -23,9 +23,9 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  // If AGENTFORGE_PASSWORD is unset, run open (dev mode). Document this in
+  // If AGENTFLOW_PASSWORD is unset, run open (dev mode). Document this in
   // .env.example so operators know the security posture they're choosing.
-  if (!process.env.AGENTFORGE_PASSWORD) {
+  if (!process.env.AGENTFLOW_PASSWORD) {
     const res = NextResponse.next();
     await maybeSetCsrfCookie(req, res);
     return res;
@@ -45,7 +45,7 @@ export async function middleware(req: NextRequest) {
   if (verdict.ok) {
     const sub = cookie ? decodeSubFromToken(cookie) : null;
     const reqHeaders = new Headers(req.headers);
-    if (sub) reqHeaders.set("x-agentforge-user-id", String(sub));
+    if (sub) reqHeaders.set("x-agentflow-user-id", String(sub));
     const res = NextResponse.next({ request: { headers: reqHeaders } });
     await maybeSetCsrfCookie(req, res);
     return res;
@@ -85,7 +85,7 @@ async function maybeSetCsrfCookie(req: NextRequest, res: NextResponse) {
 async function mintCsrfTokenEdge(): Promise<string> {
   const random = crypto.getRandomValues(new Uint8Array(18));
   const randomB64 = b64url(random);
-  const secret = process.env.AGENTFORGE_SESSION_SECRET || process.env.AGENTFORGE_PASSWORD || "agentforge-default-csrf-secret";
+  const secret = process.env.AGENTFLOW_SESSION_SECRET || process.env.AGENTFLOW_PASSWORD || "agent-flow-default-csrf-secret";
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),

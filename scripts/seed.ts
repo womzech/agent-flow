@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Seed the AgentForge DB with realistic demo data so the UI is meaningful
+ * Seed the AgentFlow DB with realistic demo data so the UI is meaningful
  * on a fresh clone. Run via `npm run seed`. Pass `--reset` to nuke the DB first.
  */
 
@@ -22,9 +22,9 @@ import { fallbackDiagnostic } from "../src/lib/anthropic";
 const RESET = process.argv.includes("--reset");
 
 function main() {
-  const dbPath = process.env.AGENTFORGE_DB
-    ? resolve(process.cwd(), process.env.AGENTFORGE_DB)
-    : resolve(process.cwd(), "data/agentforge.db");
+  const dbPath = process.env.AGENTFLOW_DB
+    ? resolve(process.cwd(), process.env.AGENTFLOW_DB)
+    : resolve(process.cwd(), "data/agent-flow.db");
 
   if (RESET && existsSync(dbPath)) {
     unlinkSync(dbPath);

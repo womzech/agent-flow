@@ -2,13 +2,13 @@
 
 > 状态：草案 → 实施中
 > 上一次更新：2026-05-13
-> 适用版本：AgentForge v0.3.0
+> 适用版本：AgentFlow v0.3.0
 
 ## 1. 目标
 
-让 AgentForge 从「单人本地工作台」升级为「小团队远程协作工作台」：
+让 AgentFlow 从「单人本地工作台」升级为「小团队远程协作工作台」：
 
-1. **企业微信交互**：团队成员（销售 / 顾问 / 老板）在企业微信里 @ 机器人或私聊机器人，可以查看自己负责的线索 / 项目状态、新建线索、收到 AgentForge 的关键事件推送（新线索、交付物完成、收款入账）。
+1. **企业微信交互**：团队成员（销售 / 顾问 / 老板）在企业微信里 @ 机器人或私聊机器人，可以查看自己负责的线索 / 项目状态、新建线索、收到 AgentFlow 的关键事件推送（新线索、交付物完成、收款入账）。
 2. **数据库权限分层**：不同角色（owner / consultant / sales / viewer）能访问的数据不同；权限映射存数据库；可在 UI 里管理。
 
 非目标（v0.3 不做）：
@@ -80,7 +80,7 @@ CREATE TABLE role_permissions (
 
 - 表单字段：`email` + `password`
 - 后端：查 `users` by email → PBKDF2 验证 → 写签名 cookie `{ sub: user_id, exp }` → 重定向 next。
-- **降级兼容**：若 `email = ""` 且密码 = `AGENTFORGE_PASSWORD`，自动以 bootstrap admin 登录（兼容 v0.2 部署）。
+- **降级兼容**：若 `email = ""` 且密码 = `AGENTFLOW_PASSWORD`，自动以 bootstrap admin 登录（兼容 v0.2 部署）。
 - 失败 1.5s 延迟，audit `auth.fail`。
 - 成功 audit `auth.login`，更新 `users.last_login_at`。
 
@@ -88,15 +88,15 @@ CREATE TABLE role_permissions (
 
 应用启动时（第一次写 schema 后）：
 
-1. 若 `users` 表为空且 `process.env.AGENTFORGE_PASSWORD` 已设置：
-   - 创建用户 `admin@local` / 密码 = `AGENTFORGE_PASSWORD` / role = owner
+1. 若 `users` 表为空且 `process.env.AGENTFLOW_PASSWORD` 已设置：
+   - 创建用户 `admin@local` / 密码 = `AGENTFLOW_PASSWORD` / role = owner
    - audit `user.create` payload `{ via: "bootstrap" }`
-2. 若空且未设置密码：保持空表，路由会显示「请设置 AGENTFORGE_PASSWORD 或调用 /api/admin/bootstrap」
+2. 若空且未设置密码：保持空表，路由会显示「请设置 AGENTFLOW_PASSWORD 或调用 /api/admin/bootstrap」
 
 ### Session
 
 - Cookie 内容：`{ sub: user_id, exp }`（签名同 v0.2）。
-- middleware 解 cookie → `verifySession()` → 把 user_id 通过 headers `x-agentforge-user-id` 透传给 RSC。
+- middleware 解 cookie → `verifySession()` → 把 user_id 通过 headers `x-agentflow-user-id` 透传给 RSC。
 - `currentUser()` 服务端 helper：从 headers 拿 user_id → 查 DB → 返回 `{ user, role, permissions[] }`。
 - 缓存：每个请求拿一次即可（RSC 调用 `cache()`）。
 
@@ -183,7 +183,7 @@ Next.js 在 Edge runtime 没有 waitUntil，所以 callback 路由用 Node runti
 
 ```
 /help              -> 显示命令清单
-/me                -> 显示当前 wecom_userid 对应的 AgentForge 用户 / 角色 / 权限
+/me                -> 显示当前 wecom_userid 对应的 AgentFlow 用户 / 角色 / 权限
 /pipeline          -> 当前 leads pipeline 统计
 /leads [stage]     -> 列出某阶段线索（默认 contacted+diagnosing+quoted）
 /projects          -> 列出活跃项目
@@ -218,14 +218,14 @@ Claude intent 结构：
 
 ```
                            ┌────────────────────┐
-                           │  AgentForge Web UI │
+                           │  AgentFlow Web UI │
                            │   email+password   │
                            └─────────┬──────────┘
                                      │ session cookie {sub:user_id}
                                      ▼
                   ┌──────── middleware ────────┐
                   │ verify cookie              │
-                  │ inject x-agentforge-user-id│
+                  │ inject x-agentflow-user-id│
                   └─────────┬──────────────────┘
                             │
         ┌───────────────────┼─────────────────────┐
@@ -279,8 +279,8 @@ Claude intent 结构：
 ## 8. 兼容性
 
 - v0.2 数据库自动升级到 v3：现有 leads / clients / ... 表不动；新增 users + roles + permissions + role_permissions。
-- v0.2 `AGENTFORGE_PASSWORD` 部署：首次启动自动建 `admin@local` / owner，密码即 ENV 值。
-- v0.2 单一密码登录：表单中 email 留空时，依然接受 `AGENTFORGE_PASSWORD` 作为 admin 登录捷径。
+- v0.2 `AGENTFLOW_PASSWORD` 部署：首次启动自动建 `admin@local` / owner，密码即 ENV 值。
+- v0.2 单一密码登录：表单中 email 留空时，依然接受 `AGENTFLOW_PASSWORD` 作为 admin 登录捷径。
 
 ## 9. 安全注记
 

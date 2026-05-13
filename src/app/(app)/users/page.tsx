@@ -25,7 +25,7 @@ export default async function UsersPage() {
       {users.length === 0 ? (
         <EmptyState
           title="还没有用户"
-          description="设置 AGENTFORGE_PASSWORD 重启可自动创建 admin@local；或手动新建。"
+          description="设置 AGENTFLOW_PASSWORD 重启可自动创建 admin@local；或手动新建。"
         />
       ) : (
         <Card className="p-0">

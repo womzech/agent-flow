@@ -1,18 +1,18 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 
-const originalSecret = process.env.AGENTFORGE_SESSION_SECRET;
-const originalPassword = process.env.AGENTFORGE_PASSWORD;
+const originalSecret = process.env.AGENTFLOW_SESSION_SECRET;
+const originalPassword = process.env.AGENTFLOW_PASSWORD;
 
 describe("csrf token issue/verify round trip", () => {
   before(() => {
-    process.env.AGENTFORGE_SESSION_SECRET = "test-csrf-secret-do-not-use";
-    delete process.env.AGENTFORGE_PASSWORD;
+    process.env.AGENTFLOW_SESSION_SECRET = "test-csrf-secret-do-not-use";
+    delete process.env.AGENTFLOW_PASSWORD;
   });
   after(() => {
-    if (originalSecret !== undefined) process.env.AGENTFORGE_SESSION_SECRET = originalSecret;
-    else delete process.env.AGENTFORGE_SESSION_SECRET;
-    if (originalPassword !== undefined) process.env.AGENTFORGE_PASSWORD = originalPassword;
+    if (originalSecret !== undefined) process.env.AGENTFLOW_SESSION_SECRET = originalSecret;
+    else delete process.env.AGENTFLOW_SESSION_SECRET;
+    if (originalPassword !== undefined) process.env.AGENTFLOW_PASSWORD = originalPassword;
   });
 
   it("issueToken produces a valid `payload.sig` shape", async () => {
@@ -39,7 +39,7 @@ describe("csrf token issue/verify round trip", () => {
 });
 
 describe("csrf: checkCsrf request inspection", () => {
-  before(() => { process.env.AGENTFORGE_SESSION_SECRET = "test-csrf-secret-do-not-use"; });
+  before(() => { process.env.AGENTFLOW_SESSION_SECRET = "test-csrf-secret-do-not-use"; });
 
   it("rejects when neither header nor cookie present", async () => {
     const { checkCsrf } = await import("../src/lib/csrf");

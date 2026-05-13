@@ -39,8 +39,8 @@ jobs:
       - name: Build (Node 20 only)
         if: matrix.node == '20.x'
         env:
-          AGENTFORGE_PASSWORD: ci-test-password
-          AGENTFORGE_BUILD_SHA: ${{ github.sha }}
+          AGENTFLOW_PASSWORD: ci-test-password
+          AGENTFLOW_BUILD_SHA: ${{ github.sha }}
         run: npm run build
 
       - name: Seed smoke test (Node 20 only)

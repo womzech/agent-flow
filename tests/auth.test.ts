@@ -1,18 +1,18 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 
-const originalPassword = process.env.AGENTFORGE_PASSWORD;
-const originalSecret = process.env.AGENTFORGE_SESSION_SECRET;
+const originalPassword = process.env.AGENTFLOW_PASSWORD;
+const originalSecret = process.env.AGENTFLOW_SESSION_SECRET;
 
 describe("auth", () => {
   before(() => {
-    process.env.AGENTFORGE_PASSWORD = "test-password";
-    delete process.env.AGENTFORGE_SESSION_SECRET;
+    process.env.AGENTFLOW_PASSWORD = "test-password";
+    delete process.env.AGENTFLOW_SESSION_SECRET;
   });
   after(() => {
-    if (originalPassword !== undefined) process.env.AGENTFORGE_PASSWORD = originalPassword;
-    else delete process.env.AGENTFORGE_PASSWORD;
-    if (originalSecret !== undefined) process.env.AGENTFORGE_SESSION_SECRET = originalSecret;
+    if (originalPassword !== undefined) process.env.AGENTFLOW_PASSWORD = originalPassword;
+    else delete process.env.AGENTFLOW_PASSWORD;
+    if (originalSecret !== undefined) process.env.AGENTFLOW_SESSION_SECRET = originalSecret;
   });
 
   it("signs and verifies a valid session", async () => {
