@@ -133,9 +133,9 @@ CI 配置见 `.github/workflows/ci.yml`，矩阵 Node 18/20。
   - 58 个测试用例（基于 `node:test`，零新依赖）+ GitHub Actions CI
   - Clients CRUD + 列表搜索过滤 + 数据 CSV/JSON 导出 + 打印友好诊断版
   - 统一 API 错误形状 + Error/loading boundaries + 性能索引
-- [ ] **v0.3**：接入企业微信 / 钉钉 / 飞书 OAuth + 机器人，模板直推客户工作台
+- [ ] **v0.3 进行中**：多用户 + RBAC + 企业微信双向交互（见 `docs/wecom-rbac-design.md`）
 - [ ] **v0.4**：客户侧 Portal（客户可看进度、提工单、付月费）
-- [ ] **v0.5**：多账号 SaaS 化（一个顾问服务 N 家客户）
+- [ ] **v0.5**：多账号 SaaS 化（一个顾问服务 N 家客户）+ 钉钉 / 飞书 / Lark 接入
 
 ## License
 
