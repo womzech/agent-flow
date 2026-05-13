@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { clientsRepo, deliverablesRepo, projectsRepo } from "@/lib/repo";
 import { buildBundle } from "@/lib/bundler";
 import { record } from "@/lib/audit";
+import { checkCsrf } from "@/lib/csrf";
 import { applyHeaders, consume, ipFromHeaders } from "@/lib/ratelimit";
 import { notifyEventAsync } from "@/lib/wecom/notify";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const csrfError = checkCsrf(req);
+  if (csrfError) return NextResponse.json({ error: csrfError, code: "csrf/failed" }, { status: 403 });
   const id = Number(params.id);
   const d = deliverablesRepo.get(id);
   if (!d) return NextResponse.json({ error: "deliverable not found" }, { status: 404 });

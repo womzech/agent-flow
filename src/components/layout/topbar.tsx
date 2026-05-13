@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoutButton } from "@/components/layout/logout-button";
 import { currentUser } from "@/lib/current-user";
 
 export async function Topbar() {
@@ -28,13 +29,7 @@ export async function Topbar() {
             <span className="rounded bg-accent-500/15 px-1.5 py-0.5 font-medium text-accent-300">{u.role.name}</span>
           </div>
         ) : null}
-        <a
-          href="/api/auth/logout"
-          title="退出"
-          className="rounded-md border border-forge-line bg-forge px-2 py-1.5 text-xs text-forge-muted transition hover:text-ink-100"
-        >
-          ⎋
-        </a>
+        <LogoutButton />
       </div>
     </header>
   );

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 type NodeKind = "trigger" | "ai" | "http" | "branch" | "transform" | "output";
 
@@ -63,8 +64,9 @@ export function BlueprintCanvas({
     try {
       const res = await fetch(`/api/blueprints/${blueprintId}`, {
         method: "PUT",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({ name, spec: { nodes, edges } }),
+        credentials: "same-origin",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setSavedAt(new Date().toLocaleTimeString());

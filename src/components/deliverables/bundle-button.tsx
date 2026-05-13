@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 export function BundleButton({
   deliverableId,
@@ -21,7 +22,11 @@ export function BundleButton({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/deliverables/${deliverableId}/bundle`, { method: "POST" });
+      const res = await fetch(`/api/deliverables/${deliverableId}/bundle`, {
+        method: "POST",
+        headers: csrfHeaders(),
+        credentials: "same-origin",
+      });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
       router.refresh();

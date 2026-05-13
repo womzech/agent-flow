@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { blueprintsRepo } from "@/lib/repo";
 import { record } from "@/lib/audit";
+import { checkCsrf } from "@/lib/csrf";
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
+  const csrfError = checkCsrf(req);
+  if (csrfError) return NextResponse.json({ error: csrfError, code: "csrf/failed" }, { status: 403 });
   const id = Number(params.id);
   if (!Number.isFinite(id) || id <= 0) {
     return NextResponse.json({ error: "invalid id", code: "params/invalid" }, { status: 400 });

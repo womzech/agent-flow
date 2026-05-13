@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { diagnosticsRepo } from "@/lib/repo";
 import { DEFAULT_MODEL, fallbackDiagnostic, generateDiagnostic, type DiagnosticQuestionnaire } from "@/lib/anthropic";
 import { record } from "@/lib/audit";
+import { checkCsrf } from "@/lib/csrf";
 import { applyHeaders, consume, ipFromHeaders } from "@/lib/ratelimit";
 import { notifyEventAsync } from "@/lib/wecom/notify";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const csrfError = checkCsrf(req);
+  if (csrfError) return NextResponse.json({ error: csrfError, code: "csrf/failed" }, { status: 403 });
   const id = Number(params.id);
   const d = diagnosticsRepo.get(id);
   if (!d) return NextResponse.json({ error: "diagnostic not found" }, { status: 404 });

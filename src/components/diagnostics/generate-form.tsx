@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { csrfHeaders } from "@/lib/csrf-client";
 
 export function GenerateReportForm({ diagnosticId, hasReport }: { diagnosticId: number; hasReport: boolean }) {
   const router = useRouter();
@@ -14,8 +15,9 @@ export function GenerateReportForm({ diagnosticId, hasReport }: { diagnosticId: 
     try {
       const res = await fetch(`/api/diagnostics/${diagnosticId}/generate`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...csrfHeaders() },
         body: JSON.stringify({ useFallback: opts.useFallback }),
+        credentials: "same-origin",
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
