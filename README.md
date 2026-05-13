@@ -133,7 +133,11 @@ CI 配置见 `.github/workflows/ci.yml`，矩阵 Node 18/20。
   - 58 个测试用例（基于 `node:test`，零新依赖）+ GitHub Actions CI
   - Clients CRUD + 列表搜索过滤 + 数据 CSV/JSON 导出 + 打印友好诊断版
   - 统一 API 错误形状 + Error/loading boundaries + 性能索引
-- [ ] **v0.3 进行中**：多用户 + RBAC + 企业微信双向交互（见 `docs/wecom-rbac-design.md`）
+- [x] **v0.3 多用户 + RBAC + 企业微信**（详见 `CHANGELOG.md` 与 `docs/wecom-rbac-design.md`）：
+  - 4 个内置角色 × 22 条权限 + PBKDF2 密码 + 签名 cookie 多用户 session
+  - 企业微信自建应用：URL 验证 + 收消息 + 异步 LLM 回复 + 主动推送
+  - 6 个 slash 命令 + Claude 中文意图路由
+  - `/users` `/roles` `/wecom` 管理 UI + 全程审计
 - [ ] **v0.4**：客户侧 Portal（客户可看进度、提工单、付月费）
 - [ ] **v0.5**：多账号 SaaS 化（一个顾问服务 N 家客户）+ 钉钉 / 飞书 / Lark 接入
 
