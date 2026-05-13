@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 
-const PUBLIC_PREFIXES = ["/login", "/share/", "/api/health", "/_next/", "/favicon.ico"];
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/share/",
+  "/api/health",
+  "/api/wecom/",     // WeCom callback must be reachable without a session.
+  "/_next/",
+  "/favicon.ico",
+];
 
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;

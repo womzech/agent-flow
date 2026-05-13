@@ -1,6 +1,7 @@
-import { Card, Field, Input, PageHeader, Section } from "@/components/ui";
+import { Card, Field, Input, PageHeader, Pill, Section } from "@/components/ui";
 import { settingsRepo } from "@/lib/repo";
 import { DEFAULT_MODEL } from "@/lib/anthropic";
+import { isConfigured as isWecomConfigured } from "@/lib/wecom/api";
 import { redirect } from "next/navigation";
 
 async function saveSettings(formData: FormData) {
@@ -35,6 +36,28 @@ export default function SettingsPage({ searchParams }: { searchParams: { saved?:
           <p className="mt-3 text-xs text-forge-muted">
             出于安全考虑，API key 必须通过环境变量（.env.local）配置，不写入数据库。
           </p>
+        </Card>
+      </Section>
+
+      <Section title="企业微信" description="v0.3 新增：双向交互 + 主动推送">
+        <Card>
+          <div className="flex items-center gap-3 text-sm">
+            <Pill tone={isWecomConfigured() ? "success" : "warning"}>{isWecomConfigured() ? "已配置" : "未配置"}</Pill>
+            <span className="text-forge-muted">
+              {isWecomConfigured()
+                ? "WECOM_CORP_ID / AGENT_ID / SECRET / TOKEN / AES_KEY 已通过环境变量配置。"
+                : "需要在 .env.local 配置 5 个 WECOM_* 环境变量后重启。"}
+            </span>
+          </div>
+          <div className="mt-3 rounded-md border border-forge-line/60 bg-forge p-3">
+            <div className="text-xs uppercase tracking-wider text-forge-muted">回调 URL</div>
+            <div className="mt-1 break-all font-mono text-xs text-accent-300">
+              {process.env.WECOM_CALLBACK_URL || "<your-base>/api/wecom/callback"}
+            </div>
+            <div className="mt-2 text-xs text-forge-muted">
+              在企业微信「应用管理 → 自建应用 → 接收消息」中粘贴此 URL，token / EncodingAESKey 与 .env 保持一致。
+            </div>
+          </div>
         </Card>
       </Section>
 
