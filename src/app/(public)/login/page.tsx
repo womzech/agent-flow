@@ -6,6 +6,7 @@ import { getDbReady } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import { rolesRepo, usersRepo } from "@/lib/repo";
 import { consume, ipFromHeaders } from "@/lib/ratelimit";
+import { create as createSession, isLockedOut, recordAttempt } from "@/lib/sessions";
 
 async function login(formData: FormData) {
   "use server";
@@ -17,6 +18,7 @@ async function login(formData: FormData) {
 
   // Rate limit per (ip + email) AND per ip alone (defense in depth).
   const ip = ipFromHeaders(headers());
+  const userAgent = headers().get("user-agent") ?? "";
   const composite = `${ip}::${email || "_anon"}`;
   const v1 = consume({ route: "login", key: composite, limit: 5, windowMs: 15 * 60 * 1000 });
   const v2 = consume({ route: "login-ip", key: ip, limit: 20, windowMs: 15 * 60 * 1000 });
@@ -25,23 +27,32 @@ async function login(formData: FormData) {
     return redirect(`/login?error=1&hint=rate-limited&next=${encodeURIComponent(next)}`);
   }
 
+  // Account lockout: 5 failed (email + ip) in 15 minutes → block until window expires.
+  if (email && isLockedOut({ email, ip })) {
+    record({ action: "auth.fail", entity: "session", payload: { reason: "locked-out", ip, email } });
+    return redirect(`/login?error=1&hint=locked-out&next=${encodeURIComponent(next)}`);
+  }
+
   // Case 1: e-mail provided → multi-user login path.
   if (email) {
     const user = email ? usersRepo.getByEmail(email) : null;
     if (!user || user.status !== "active") {
+      recordAttempt({ email, ip, ok: false });
       record({ action: "auth.fail", entity: "session", payload: { email, reason: "no-user" } });
       await sleep(1500);
       return redirect(`/login?error=1&next=${encodeURIComponent(next)}`);
     }
     const ok = await verifyPassword(password, user);
     if (!ok) {
+      recordAttempt({ email, ip, ok: false });
       record({ action: "auth.fail", entity: "session", entityId: user.id, payload: { email, reason: "bad-password" } });
       await sleep(1500);
       return redirect(`/login?error=1&next=${encodeURIComponent(next)}`);
     }
-    await setSession(user.id);
+    recordAttempt({ email, ip, ok: true });
+    await setSessionWith(user.id, ip, userAgent);
     usersRepo.touchLogin(user.id);
-    record({ action: "auth.login", entity: "session", entityId: user.id, payload: { email } });
+    record({ action: "auth.login", entity: "session", entityId: user.id, payload: { email, ip } });
     return redirect(next);
   }
 
@@ -62,23 +73,36 @@ async function login(formData: FormData) {
   // Either find or fall back to admin@local (bootstrap creates it).
   const admin = usersRepo.getByEmail("admin@local");
   if (admin) {
-    await setSession(admin.id);
+    recordAttempt({ email: "admin@local", ip, ok: true });
+    await setSessionWith(admin.id, ip, userAgent);
     usersRepo.touchLogin(admin.id);
-    record({ action: "auth.login", entity: "session", entityId: admin.id, payload: { mode: "legacy" } });
+    record({ action: "auth.login", entity: "session", entityId: admin.id, payload: { mode: "legacy", ip } });
     return redirect(next);
   }
   // Last-resort: no users yet, no admin row — issue a session with sub=0 so
   // middleware approves but no user record exists. This shouldn't happen in
   // practice because bootstrap runs eagerly, but it keeps the login UX honest
   // for ops who set AGENTFORGE_PASSWORD AFTER the first page load.
-  await setSession(undefined);
+  await setSessionLegacyNoUser();
   record({ action: "auth.login", entity: "session", payload: { mode: "legacy-no-user" } });
   return redirect(next);
   void userCount;
 }
 
-async function setSession(sub: number | undefined) {
-  const token = await signSession({ exp: expectedExp(), sub });
+async function setSessionWith(sub: number, ip: string, userAgent: string) {
+  const sess = createSession({ userId: sub, ip, userAgent });
+  const token = await signSession({ exp: expectedExp(), sub, sid: sess.jti });
+  cookies().set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: SESSION_TTL_SECONDS,
+    path: "/",
+  });
+}
+
+async function setSessionLegacyNoUser() {
+  const token = await signSession({ exp: expectedExp() });
   cookies().set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -142,6 +166,8 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
                 ? "服务器未配置 AGENTFORGE_PASSWORD，且账户不存在。"
                 : hint === "rate-limited"
                 ? "登录请求过于频繁，请 15 分钟后再试。"
+                : hint === "locked-out"
+                ? "账号已锁定（15 分钟内连续 5 次失败）。请稍后再试或联系管理员。"
                 : "邮箱或密码错误。"}
             </div>
           ) : null}

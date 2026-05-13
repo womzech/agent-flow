@@ -7,6 +7,7 @@ import { SESSION_COOKIE, verifySession } from "./auth";
 import { getDbReady } from "./db";
 import { permissionsRepo, rolesRepo, usersRepo, type Role, type User } from "./repo";
 import type { Permission, Resource } from "./schema";
+import { findActiveByJti, touchLastUsed } from "./sessions";
 
 export interface CurrentUser {
   user: User;
@@ -69,6 +70,26 @@ export const currentUser = cache(async (): Promise<CurrentUser | null> => {
     }
   }
 
+  // Verify the cookie's `sid` (jti) is still active in the sessions table.
+  // Pre-v0.4 cookies have no sid → we accept them (back-compat); newly
+  // issued cookies always carry one.
+  if (userId) {
+    try {
+      const cookie = cookies().get(SESSION_COOKIE)?.value;
+      if (cookie) {
+        const sid = decodeSid(cookie);
+        if (sid) {
+          const sess = findActiveByJti(sid);
+          if (!sess) {
+            // Revoked / unknown session → treat as logged out.
+            return null;
+          }
+          touchLastUsed(sid);
+        }
+      }
+    } catch { /* see above */ }
+  }
+
   if (!userId || !Number.isFinite(userId)) return null;
   const user = usersRepo.get(userId);
   if (!user || user.status !== "active") return null;
@@ -79,7 +100,7 @@ export const currentUser = cache(async (): Promise<CurrentUser | null> => {
 });
 
 function decodeSub(token: string): number | null {
-  // Token format: base64url(JSON({sub,exp})).base64url(sig) — we already
+  // Token format: base64url(JSON({sub,exp,sid?})).base64url(sig) — we already
   // know signature is valid by this point, so trust the body.
   const body = token.split(".")[0];
   try {
@@ -87,6 +108,18 @@ function decodeSub(token: string): number | null {
     const std = (body + pad).replace(/-/g, "+").replace(/_/g, "/");
     const obj = JSON.parse(atob(std)) as { sub?: number };
     return typeof obj.sub === "number" ? obj.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+function decodeSid(token: string): string | null {
+  const body = token.split(".")[0];
+  try {
+    const pad = body.length % 4 === 0 ? "" : "=".repeat(4 - (body.length % 4));
+    const std = (body + pad).replace(/-/g, "+").replace(/_/g, "/");
+    const obj = JSON.parse(atob(std)) as { sid?: string };
+    return typeof obj.sid === "string" ? obj.sid : null;
   } catch {
     return null;
   }

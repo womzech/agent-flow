@@ -54,7 +54,7 @@ function subtle(): SubtleCrypto {
 }
 
 /** Browser-safe: must work in Edge runtime where node:crypto is unavailable. */
-export async function signSession(payload: { exp: number; v?: number; sub?: number }): Promise<string> {
+export async function signSession(payload: { exp: number; v?: number; sub?: number; sid?: string }): Promise<string> {
   const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
   const key = await subtle().importKey(
     "raw",
