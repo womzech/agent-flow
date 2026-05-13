@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { diagnosticsRepo } from "@/lib/repo";
 import { DEFAULT_MODEL, fallbackDiagnostic, generateDiagnostic, type DiagnosticQuestionnaire } from "@/lib/anthropic";
 import { record } from "@/lib/audit";
+import { notifyEventAsync } from "@/lib/wecom/notify";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const id = Number(params.id);
@@ -36,6 +37,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       entityId: id,
       payload: { model: result.modelUsed, fallback: useFallback, templates: result.recommendedTemplates },
     });
+    const refreshed = diagnosticsRepo.get(id);
+    if (refreshed) {
+      notifyEventAsync({
+        kind: "diagnostic.generate",
+        diagnostic: {
+          id: refreshed.id,
+          title: refreshed.title,
+          pricing_quote_cents: refreshed.pricing_quote_cents,
+          monthly_quote_cents: refreshed.monthly_quote_cents,
+          share_token: refreshed.share_token,
+        },
+      });
+    }
     return NextResponse.json({ ok: true, modelUsed: result.modelUsed, fallbackUsed: useFallback, defaultModel: DEFAULT_MODEL });
   } catch (err) {
     diagnosticsRepo.update(id, { status: "draft" });

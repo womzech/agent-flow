@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { clientsRepo, deliverablesRepo, projectsRepo } from "@/lib/repo";
 import { buildBundle } from "@/lib/bundler";
 import { record } from "@/lib/audit";
+import { notifyEventAsync } from "@/lib/wecom/notify";
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const id = Number(params.id);
@@ -24,6 +25,12 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       entity: "deliverable",
       entityId: id,
       payload: { template: d.template_slug, size: r.zipSize, files: r.files.length },
+    });
+    notifyEventAsync({
+      kind: "deliverable.bundle",
+      deliverable: { id, project_id: d.project_id, template_slug: d.template_slug, bundle_size_bytes: r.zipSize },
+      project: project?.name,
+      client: client?.company,
     });
     return NextResponse.json({ ok: true, files: r.files, size: r.zipSize });
   } catch (err) {

@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
 import { record } from "@/lib/audit";
-import { requirePermission, requireUser } from "@/lib/current-user";
+import { requirePermission } from "@/lib/current-user";
 import { leadsRepo } from "@/lib/repo";
+import { notifyEventAsync } from "@/lib/wecom/notify";
 import { LEAD_SOURCES, LEAD_SOURCE_LABELS, LEAD_STAGES, LEAD_STAGE_LABELS, type LeadSource, type LeadStage } from "@/lib/schema";
 
 async function createLead(formData: FormData) {
@@ -23,6 +24,11 @@ async function createLead(formData: FormData) {
     next_action: String(formData.get("next_action") ?? "").trim(),
   });
   record({ actor: u.user.email, action: "lead.create", entity: "lead", entityId: created.id, payload: { company: created.company } });
+  notifyEventAsync({
+    kind: "lead.create",
+    lead: { id: created.id, company: created.company, name: created.name, industry: created.industry, pain_points: created.pain_points, source: created.source },
+    actor: u.user.name,
+  });
   redirect(`/leads/${created.id}`);
 }
 

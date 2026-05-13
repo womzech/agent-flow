@@ -76,12 +76,24 @@ async function addRevenue(projectId: number, formData: FormData) {
   const amount = Number(formData.get("amount") || 0);
   if (amount <= 0) return;
   const p = projectsRepo.get(projectId);
-  revenueRepo.add({
+  const client = p?.client_id ? clientsRepo.get(p.client_id) : null;
+  const kind = (formData.get("kind") as RevenueKind) || "project";
+  const memo = String(formData.get("memo") ?? "");
+  const id = revenueRepo.add({
     project_id: projectId,
     client_id: p?.client_id ?? null,
-    kind: (formData.get("kind") as RevenueKind) || "project",
+    kind,
     amount_cents: Math.round(amount * 100),
-    memo: String(formData.get("memo") ?? ""),
+    memo,
+  });
+  const { record } = await import("@/lib/audit");
+  record({ action: "revenue.add", entity: "revenue", entityId: id, payload: { amount, kind, project: p?.name } });
+  const { notifyEventAsync } = await import("@/lib/wecom/notify");
+  notifyEventAsync({
+    kind: "revenue.add",
+    revenue: { id, kind, amount_cents: Math.round(amount * 100), memo },
+    project: p?.name,
+    client: client?.company,
   });
   redirect(`/projects/${projectId}`);
 }
