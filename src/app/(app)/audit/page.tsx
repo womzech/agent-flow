@@ -1,4 +1,5 @@
 import { Card, EmptyState, PageHeader, Pill } from "@/components/ui";
+import { requirePermission } from "@/lib/current-user";
 import { appliedMigrations } from "@/lib/db";
 import { countAll, list, type AuditEvent } from "@/lib/audit";
 import type { AuditAction } from "@/lib/schema";
@@ -15,9 +16,14 @@ const actionTone: Record<string, "neutral" | "accent" | "success" | "warning" | 
   "deliverable.download": "warning",
   "export.csv": "warning",
   "export.json": "warning",
+  "wecom.fail": "danger",
+  "wecom.receive": "accent",
+  "wecom.reply": "success",
+  "user.create": "accent",
 };
 
-export default function AuditPage({ searchParams }: { searchParams: { entity?: string; action?: string; entity_id?: string } }) {
+export default async function AuditPage({ searchParams }: { searchParams: { entity?: string; action?: string; entity_id?: string } }) {
+  await requirePermission("read", "audit");
   const events: AuditEvent[] = list({
     entity: searchParams.entity || undefined,
     entityId: searchParams.entity_id ? Number(searchParams.entity_id) : undefined,

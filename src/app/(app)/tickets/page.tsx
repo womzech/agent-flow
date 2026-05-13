@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Card, EmptyState, PageHeader, Pill } from "@/components/ui";
+import { requirePermission } from "@/lib/current-user";
 import { projectsRepo, ticketsRepo } from "@/lib/repo";
 import { fmtDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default function TicketsPage() {
+export default async function TicketsPage() {
+  await requirePermission("read", "tickets");
   const tickets = ticketsRepo.list();
   const projects = projectsRepo.list();
   const projectName = (id: number | null) => (id ? projects.find((p) => p.id === id)?.name ?? "—" : "—");

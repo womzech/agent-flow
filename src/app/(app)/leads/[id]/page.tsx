@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Card, Field, Input, PageHeader, Pill, Section, Select, Textarea } from "@/components/ui";
+import { record } from "@/lib/audit";
+import { requirePermission } from "@/lib/current-user";
 import { clientsRepo, diagnosticsRepo, leadsRepo } from "@/lib/repo";
 import {
   LEAD_SOURCES,
@@ -14,6 +16,7 @@ import { fmtDate } from "@/lib/utils";
 
 async function updateLead(id: number, formData: FormData) {
   "use server";
+  const u = await requirePermission("write", "leads");
   leadsRepo.update(id, {
     name: String(formData.get("name") ?? "").trim(),
     company: String(formData.get("company") ?? "").trim(),
@@ -25,11 +28,14 @@ async function updateLead(id: number, formData: FormData) {
     budget_note: String(formData.get("budget_note") ?? "").trim(),
     next_action: String(formData.get("next_action") ?? "").trim(),
   });
+  record({ actor: u.user.email, action: "lead.update", entity: "lead", entityId: id });
   redirect(`/leads/${id}`);
 }
 
 async function convertToClient(id: number) {
   "use server";
+  const u = await requirePermission("write", "leads");
+  await requirePermission("write", "clients");
   const lead = leadsRepo.get(id);
   if (!lead) return;
   let clientId = lead.client_id;
@@ -46,10 +52,12 @@ async function convertToClient(id: number) {
     clientId = client.id;
   }
   leadsRepo.update(id, { client_id: clientId, stage: lead.stage === "lead" ? "contacted" : lead.stage });
+  record({ actor: u.user.email, action: "lead.convert", entity: "lead", entityId: id, payload: { client_id: clientId } });
   redirect(`/diagnostics/new?lead=${id}`);
 }
 
-export default function LeadDetailPage({ params }: { params: { id: string } }) {
+export default async function LeadDetailPage({ params }: { params: { id: string } }) {
+  await requirePermission("read", "leads");
   const id = Number(params.id);
   const lead = leadsRepo.get(id);
   if (!lead) notFound();

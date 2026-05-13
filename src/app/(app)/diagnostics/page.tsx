@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Card, EmptyState, PageHeader, Pill } from "@/components/ui";
+import { requirePermission } from "@/lib/current-user";
 import { diagnosticsRepo } from "@/lib/repo";
 import { fmtCents, fmtDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default function DiagnosticsListPage() {
+export default async function DiagnosticsListPage() {
+  await requirePermission("read", "diagnostics");
   const list = diagnosticsRepo.list();
   return (
     <div className="mx-auto max-w-5xl">

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Card, EmptyState, PageHeader, Pill } from "@/components/ui";
+import { requirePermission } from "@/lib/current-user";
 import { clientsRepo, deliverablesRepo, projectsRepo, ticketsRepo } from "@/lib/repo";
 import { PROJECT_STATUS_LABELS } from "@/lib/schema";
 import { fmtCents, fmtDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default function ProjectsListPage() {
+export default async function ProjectsListPage() {
+  await requirePermission("read", "projects");
   const projects = projectsRepo.list();
   const clients = clientsRepo.list();
   const clientName = (id: number | null) => (id ? clients.find((c) => c.id === id)?.company ?? "—" : "—");

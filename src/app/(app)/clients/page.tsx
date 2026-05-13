@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Card, EmptyState, PageHeader, Pill } from "@/components/ui";
+import { requirePermission } from "@/lib/current-user";
 import { clientsRepo, projectsRepo, revenueRepo } from "@/lib/repo";
 import { fmtCents, fmtDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default function ClientsPage({ searchParams }: { searchParams: { q?: string } }) {
+export default async function ClientsPage({ searchParams }: { searchParams: { q?: string } }) {
+  await requirePermission("read", "clients");
   const q = (searchParams.q ?? "").trim();
   const clients = clientsRepo.list(q ? { q } : undefined);
   const projects = projectsRepo.list();

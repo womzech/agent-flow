@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
 import { Card, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
+import { record } from "@/lib/audit";
+import { requirePermission, requireUser } from "@/lib/current-user";
 import { leadsRepo } from "@/lib/repo";
 import { LEAD_SOURCES, LEAD_SOURCE_LABELS, LEAD_STAGES, LEAD_STAGE_LABELS, type LeadSource, type LeadStage } from "@/lib/schema";
 
 async function createLead(formData: FormData) {
   "use server";
+  const u = await requirePermission("write", "leads");
   const name = String(formData.get("name") ?? "").trim();
   const company = String(formData.get("company") ?? "").trim();
   if (!name || !company) return;
@@ -19,10 +22,12 @@ async function createLead(formData: FormData) {
     budget_note: String(formData.get("budget_note") ?? "").trim(),
     next_action: String(formData.get("next_action") ?? "").trim(),
   });
+  record({ actor: u.user.email, action: "lead.create", entity: "lead", entityId: created.id, payload: { company: created.company } });
   redirect(`/leads/${created.id}`);
 }
 
-export default function NewLeadPage() {
+export default async function NewLeadPage() {
+  await requirePermission("write", "leads");
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader title="新建线索" description="把刚刚加到微信 / 闲鱼私聊里的潜在客户录进来。" />

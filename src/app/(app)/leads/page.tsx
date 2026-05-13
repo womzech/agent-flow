@@ -10,9 +10,12 @@ import {
   type LeadStage,
 } from "@/lib/schema";
 
+import { requirePermission } from "@/lib/current-user";
+
 export const dynamic = "force-dynamic";
 
-export default function LeadsKanbanPage({ searchParams }: { searchParams: { q?: string; stage?: string; source?: string } }) {
+export default async function LeadsKanbanPage({ searchParams }: { searchParams: { q?: string; stage?: string; source?: string } }) {
+  await requirePermission("read", "leads");
   const q = (searchParams.q ?? "").trim();
   const stageFilter = (LEAD_STAGES as readonly string[]).includes(searchParams.stage ?? "")
     ? (searchParams.stage as LeadStage)
