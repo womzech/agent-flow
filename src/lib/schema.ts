@@ -2,11 +2,13 @@
  * Single source of truth for the AgentForge SQLite schema.
  *
  * CHANGELOG
- *  - 2026-05-13: Initial schema (leads, clients, diagnostics, projects, blueprints,
+ *  - v1 (2026-05-13): Initial schema (leads, clients, diagnostics, projects, blueprints,
  *    templates, deliverables, tickets, revenue_log).
+ *  - v2 (2026-05-13): audit_log table + secondary indexes for hot queries.
+ *    schema_migrations table tracks applied versions.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS leads (
@@ -118,6 +120,34 @@ CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version  INTEGER PRIMARY KEY,
+  applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor         TEXT    NOT NULL DEFAULT 'system',
+  action        TEXT    NOT NULL,
+  entity        TEXT    NOT NULL,
+  entity_id     INTEGER,
+  payload_json  TEXT    NOT NULL DEFAULT '{}',
+  at            TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_at        ON audit_log(at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_entity    ON audit_log(entity, entity_id);
+CREATE INDEX IF NOT EXISTS idx_leads_stage         ON leads(stage);
+CREATE INDEX IF NOT EXISTS idx_leads_client_id     ON leads(client_id);
+CREATE INDEX IF NOT EXISTS idx_diagnostics_status  ON diagnostics(status);
+CREATE INDEX IF NOT EXISTS idx_diagnostics_lead    ON diagnostics(lead_id);
+CREATE INDEX IF NOT EXISTS idx_projects_status     ON projects(status);
+CREATE INDEX IF NOT EXISTS idx_projects_client     ON projects(client_id);
+CREATE INDEX IF NOT EXISTS idx_deliverables_proj   ON deliverables(project_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_proj_status ON tickets(project_id, status);
+CREATE INDEX IF NOT EXISTS idx_revenue_paid_at     ON revenue_log(paid_at);
+CREATE INDEX IF NOT EXISTS idx_revenue_project     ON revenue_log(project_id);
 `;
 
 /** Enums kept in TS-land for autocomplete + UI labels. */
@@ -194,3 +224,17 @@ export const REVENUE_KIND_LABELS: Record<RevenueKind, string> = {
   monthly: "月费",
   other: "其他",
 };
+
+export const AUDIT_ACTIONS = [
+  "lead.create", "lead.update", "lead.convert",
+  "client.create", "client.update",
+  "diagnostic.create", "diagnostic.generate", "diagnostic.share", "diagnostic.convert",
+  "project.create", "project.update",
+  "blueprint.create", "blueprint.update",
+  "deliverable.create", "deliverable.update", "deliverable.bundle", "deliverable.download",
+  "ticket.create", "ticket.update",
+  "revenue.add",
+  "auth.login", "auth.logout", "auth.fail",
+  "export.csv", "export.json",
+] as const;
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];

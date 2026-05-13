@@ -118,8 +118,18 @@ export interface RevenueRow {
 /* ---------- Leads ---------- */
 
 export const leadsRepo = {
-  list(): Lead[] {
-    return getDb().prepare("SELECT * FROM leads ORDER BY updated_at DESC, id DESC").all() as Lead[];
+  list(opts?: { q?: string; stage?: LeadStage; source?: LeadSource }): Lead[] {
+    const conds: string[] = [];
+    const params: unknown[] = [];
+    if (opts?.q) {
+      conds.push("(name LIKE ? OR company LIKE ? OR industry LIKE ? OR pain_points LIKE ? OR contact LIKE ?)");
+      const like = `%${opts.q}%`;
+      params.push(like, like, like, like, like);
+    }
+    if (opts?.stage) { conds.push("stage = ?"); params.push(opts.stage); }
+    if (opts?.source) { conds.push("source = ?"); params.push(opts.source); }
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    return getDb().prepare(`SELECT * FROM leads ${where} ORDER BY updated_at DESC, id DESC`).all(...params) as Lead[];
   },
   get(id: number): Lead | undefined {
     return getDb().prepare("SELECT * FROM leads WHERE id = ?").get(id) as Lead | undefined;
@@ -158,7 +168,14 @@ export const leadsRepo = {
 /* ---------- Clients ---------- */
 
 export const clientsRepo = {
-  list(): Client[] {
+  list(opts?: { q?: string }): Client[] {
+    if (opts?.q) {
+      const like = `%${opts.q}%`;
+      return getDb().prepare(
+        `SELECT * FROM clients WHERE name LIKE ? OR company LIKE ? OR industry LIKE ? OR contact LIKE ? OR notes LIKE ?
+         ORDER BY created_at DESC, id DESC`,
+      ).all(like, like, like, like, like) as Client[];
+    }
     return getDb().prepare("SELECT * FROM clients ORDER BY created_at DESC, id DESC").all() as Client[];
   },
   get(id: number): Client | undefined {
@@ -172,6 +189,18 @@ export const clientsRepo = {
       )
       .run(input);
     return this.get(Number(info.lastInsertRowid))!;
+  },
+  update(id: number, patch: Partial<Omit<Client, "id" | "created_at">>): Client | undefined {
+    const current = this.get(id);
+    if (!current) return undefined;
+    const next = { ...current, ...patch };
+    getDb()
+      .prepare(
+        `UPDATE clients SET name=@name, company=@company, industry=@industry, size=@size,
+         contact=@contact, billing_email=@billing_email, notes=@notes WHERE id=@id`,
+      )
+      .run(next);
+    return next;
   },
 };
 

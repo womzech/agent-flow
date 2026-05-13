@@ -9,6 +9,7 @@ const NAV_SECTIONS: { title: string; items: { href: string; label: string; hint?
     title: "销售 Sales",
     items: [
       { href: "/leads", label: "线索 Pipeline", hint: "看板视图" },
+      { href: "/clients", label: "客户名册", hint: "已成交" },
       { href: "/diagnostics", label: "诊断报告", hint: "5000-10000 元 hook" },
     ],
   },
@@ -31,8 +32,11 @@ const NAV_SECTIONS: { title: string; items: { href: string; label: string; hint?
     ],
   },
   {
-    title: "设置",
-    items: [{ href: "/settings", label: "Settings" }],
+    title: "运维 Ops",
+    items: [
+      { href: "/audit", label: "审计日志", hint: "全部状态变更" },
+      { href: "/settings", label: "Settings" },
+    ],
   },
 ];
 

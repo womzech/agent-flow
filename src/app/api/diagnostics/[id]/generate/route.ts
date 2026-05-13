@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { diagnosticsRepo } from "@/lib/repo";
 import { DEFAULT_MODEL, fallbackDiagnostic, generateDiagnostic, type DiagnosticQuestionnaire } from "@/lib/anthropic";
+import { record } from "@/lib/audit";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const id = Number(params.id);
@@ -29,6 +30,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       model_used: result.modelUsed,
     });
     diagnosticsRepo.ensureShareToken(id);
+    record({
+      action: "diagnostic.generate",
+      entity: "diagnostic",
+      entityId: id,
+      payload: { model: result.modelUsed, fallback: useFallback, templates: result.recommendedTemplates },
+    });
     return NextResponse.json({ ok: true, modelUsed: result.modelUsed, fallbackUsed: useFallback, defaultModel: DEFAULT_MODEL });
   } catch (err) {
     diagnosticsRepo.update(id, { status: "draft" });

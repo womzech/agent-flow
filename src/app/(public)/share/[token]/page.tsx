@@ -13,7 +13,12 @@ export default function SharedDiagnosticPage({ params }: { params: { token: stri
     <div className="mx-auto max-w-3xl px-6 py-10">
       <div className="mb-2 flex items-center justify-between text-xs text-forge-muted">
         <span>由 AgentForge / 智造工坊 出具</span>
-        <span>生成于 {fmtDate(d.generated_at)}</span>
+        <span>
+          生成于 {fmtDate(d.generated_at)} ·{" "}
+          <a href={`/share/${params.token}/print`} className="text-accent-400 hover:underline">
+            打印 / PDF 版 →
+          </a>
+        </span>
       </div>
       <h1 className="mb-6 text-2xl font-semibold text-ink-50">{d.title}</h1>
       <div className="mb-8 grid grid-cols-2 gap-3 rounded-lg border border-forge-line bg-forge-panel/60 p-4">

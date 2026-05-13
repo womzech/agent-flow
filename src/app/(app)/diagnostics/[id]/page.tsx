@@ -67,12 +67,20 @@ export default function DiagnosticDetailPage({ params }: { params: { id: string 
         title={d.title}
         description={`${d.client_id ? "已关联客户" : "未关联客户"} · 创建于 ${fmtDate(d.created_at)}`}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {d.share_token ? (
-              <Link href={`/share/${d.share_token}`} target="_blank" className="rounded-md border border-forge-line bg-forge px-3 py-1.5 text-sm hover:bg-forge-line/60">
-                分享链接
-              </Link>
+              <>
+                <Link href={`/share/${d.share_token}`} target="_blank" className="rounded-md border border-forge-line bg-forge px-3 py-1.5 text-sm hover:bg-forge-line/60">
+                  分享链接
+                </Link>
+                <Link href={`/share/${d.share_token}/print`} target="_blank" className="rounded-md border border-forge-line bg-forge px-3 py-1.5 text-sm hover:bg-forge-line/60">
+                  打印版
+                </Link>
+              </>
             ) : null}
+            <a href={`/api/export/diagnostics/${id}`} className="rounded-md border border-forge-line bg-forge px-3 py-1.5 text-sm hover:bg-forge-line/60">
+              ⬇ JSON
+            </a>
             {d.status === "ready" || d.status === "shared" ? (
               <form action={convert}>
                 <button className="rounded-md bg-accent-500 px-3 py-1.5 text-sm font-medium text-forge hover:bg-accent-400">

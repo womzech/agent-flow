@@ -95,6 +95,18 @@ export default function HomePage() {
         </Section>
       </div>
 
+      <Section title="数据导出 & 运维" description="一键下载 CSV / JSON，便于报税、对账、备份">
+        <Card>
+          <div className="flex flex-wrap gap-2 text-sm">
+            <a href="/api/export/leads.csv" className="rounded-md border border-forge-line bg-forge px-3 py-1.5 hover:bg-forge-line/60">⬇ leads.csv</a>
+            <a href="/api/export/projects.csv" className="rounded-md border border-forge-line bg-forge px-3 py-1.5 hover:bg-forge-line/60">⬇ projects.csv</a>
+            <a href="/api/export/revenue.csv" className="rounded-md border border-forge-line bg-forge px-3 py-1.5 hover:bg-forge-line/60">⬇ revenue.csv</a>
+            <Link href="/audit" className="rounded-md bg-forge-line/60 px-3 py-1.5 hover:bg-forge-line">📜 审计日志</Link>
+            <a href="/api/health" target="_blank" className="rounded-md bg-forge-line/60 px-3 py-1.5 hover:bg-forge-line">💓 健康检查</a>
+          </div>
+        </Card>
+      </Section>
+
       <Section title="待办工单" description="活跃工单一览">
         {tickets.filter((t) => t.status === "open" || t.status === "in_progress").length === 0 ? (
           <EmptyState title="没有未关闭工单" description="客户反馈和月度维护任务会出现在这里" />

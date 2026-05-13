@@ -20,6 +20,13 @@ export function Topbar() {
         >
           + 新建诊断
         </Link>
+        <a
+          href="/api/auth/logout"
+          title="退出"
+          className="ml-1 rounded-md border border-forge-line bg-forge px-2 py-1.5 text-xs text-forge-muted transition hover:text-ink-100"
+        >
+          ⎋
+        </a>
       </div>
     </header>
   );

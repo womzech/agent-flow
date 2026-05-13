@@ -1,6 +1,6 @@
 {
   "name": "agentforge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "AI Agent consultant workbench: sales, design, development, delivery in one repo.",
   "scripts": {
@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
-    "db:reset": "rm -f data/agentforge.db && npm run seed"
+    "db:reset": "rm -f data/agentforge.db && npm run seed",
+    "test": "node --import ./tests/preamble.mjs --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

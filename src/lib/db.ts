@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { SCHEMA_SQL } from "./schema";
+import { SCHEMA_SQL, SCHEMA_VERSION } from "./schema";
 
 const DB_PATH = process.env.AGENTFORGE_DB
   ? resolve(process.cwd(), process.env.AGENTFORGE_DB)
@@ -18,7 +18,17 @@ function open() {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA_SQL);
+  recordMigration(db, SCHEMA_VERSION);
   return db;
+}
+
+function recordMigration(db: Database.Database, version: number) {
+  // schema_migrations exists because SCHEMA_SQL just created it (IF NOT EXISTS).
+  db.prepare(`INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)`).run(version);
+}
+
+export function appliedMigrations(): { version: number; applied_at: string }[] {
+  return getDb().prepare(`SELECT version, applied_at FROM schema_migrations ORDER BY version`).all() as { version: number; applied_at: string }[];
 }
 
 export function getDb(): Database.Database {

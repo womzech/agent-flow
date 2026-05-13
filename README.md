@@ -68,14 +68,29 @@ AgentForge 围绕这四点，把顾问每天要做的事情结构化：
 ## 快速开始
 
 ```bash
-git clone git@github.com:womzech/cash-flow.git agentforge
+git clone git@github.com:womzech/agentforge.git
 cd agentforge
 npm install
 cp .env.example .env.local
-# 在 .env.local 填入 ANTHROPIC_API_KEY
+# 在 .env.local 至少填入 AGENTFORGE_PASSWORD（启用鉴权）
+# 可选：ANTHROPIC_API_KEY（不配则诊断走本地占位模板）
 npm run seed          # 初始化数据库 + 种子数据
 npm run dev           # 启动 http://localhost:3000
 ```
+
+启动后访问 `/login` 用密码登录。所有 `/(app)/*` 与 `/api/*` 路由都被中间件保护；
+`/share/<token>` 与 `/api/health` 公开，便于把诊断报告分享给客户、把健康检查暴露给监控。
+
+### 验证
+
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # next lint
+npm test            # node:test, 58 cases, 0 new deps
+npm run build       # production build, 28 routes + middleware
+```
+
+CI 配置见 `.github/workflows/ci.yml`，矩阵 Node 18/20。
 
 ## 目录结构
 
@@ -112,11 +127,15 @@ npm run dev           # 启动 http://localhost:3000
 
 ## 路线图
 
-- [x] **MVP（当前 repo）**：CRM-lite + 诊断生成 + Blueprint + Template + Bundler
-- [ ] **v0.2**：把模板的 Python 脚本变成可在浏览器试运行的沙箱
-- [ ] **v0.3**：接入企业微信 / 钉钉 / 飞书的 OAuth + 机器人，把模板直接推送到客户工作台
+- [x] **v0.1 MVP**：CRM-lite + 诊断生成 + Blueprint + Template + Bundler
+- [x] **v0.2 企业级硬化**（见 `CHANGELOG.md`）：
+  - 单租户鉴权（HMAC 签名 cookie）+ 审计日志 + Schema migrations + Health endpoint
+  - 58 个测试用例（基于 `node:test`，零新依赖）+ GitHub Actions CI
+  - Clients CRUD + 列表搜索过滤 + 数据 CSV/JSON 导出 + 打印友好诊断版
+  - 统一 API 错误形状 + Error/loading boundaries + 性能索引
+- [ ] **v0.3**：接入企业微信 / 钉钉 / 飞书 OAuth + 机器人，模板直推客户工作台
 - [ ] **v0.4**：客户侧 Portal（客户可看进度、提工单、付月费）
-- [ ] **v0.5**：多账号 SaaS 化（一个顾问可服务 N 家客户）
+- [ ] **v0.5**：多账号 SaaS 化（一个顾问服务 N 家客户）
 
 ## License
 

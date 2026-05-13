@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { clientsRepo, deliverablesRepo, projectsRepo } from "@/lib/repo";
 import { buildBundle } from "@/lib/bundler";
+import { record } from "@/lib/audit";
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const id = Number(params.id);
@@ -18,6 +19,12 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       projectName: project?.name ?? `Deliverable #${id}`,
     });
     deliverablesRepo.markBundled(id, r.zipPath, r.zipSize);
+    record({
+      action: "deliverable.bundle",
+      entity: "deliverable",
+      entityId: id,
+      payload: { template: d.template_slug, size: r.zipSize, files: r.files.length },
+    });
     return NextResponse.json({ ok: true, files: r.files, size: r.zipSize });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

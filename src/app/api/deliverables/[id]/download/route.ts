@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readFileSync, existsSync } from "node:fs";
 import { basename } from "node:path";
 import { deliverablesRepo } from "@/lib/repo";
+import { record } from "@/lib/audit";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const id = Number(params.id);
@@ -9,6 +10,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!d || !d.bundle_path) return NextResponse.json({ error: "no bundle yet" }, { status: 404 });
   if (!existsSync(d.bundle_path)) return NextResponse.json({ error: "bundle file missing" }, { status: 410 });
   const buf = readFileSync(d.bundle_path);
+  record({ action: "deliverable.download", entity: "deliverable", entityId: id, payload: { size: buf.length } });
   return new NextResponse(buf, {
     status: 200,
     headers: {
