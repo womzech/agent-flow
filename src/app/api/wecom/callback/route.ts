@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { record } from "@/lib/audit";
+import { applyHeaders, consume } from "@/lib/ratelimit";
 import { readConfig } from "@/lib/wecom/api";
 import { decrypt, parseEnvelopeXml, sign } from "@/lib/wecom/crypto";
 import { fromXmlFields } from "@/lib/wecom/types";
@@ -51,6 +52,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const cfg = readConfig();
   if (!cfg) return new NextResponse("WeCom not configured", { status: 503 });
+
+  // Global rate limit on callbacks — WeCom should not exceed this in normal
+  // operation, so hitting the cap means we're being scanned / replayed.
+  const rl = consume({ route: "wecom-callback", key: "global", limit: 100, windowMs: 60_000 });
+  if (!rl.ok) {
+    record({ action: "wecom.fail", entity: "wecom", payload: { stage: "ratelimit", retry_after: rl.retryAfterSec } });
+    const res = new NextResponse("rate limited", { status: 429 });
+    applyHeaders(res.headers, rl, 100);
+    return res;
+  }
 
   const sp = req.nextUrl.searchParams;
   const msgSignature = sp.get("msg_signature") ?? "";

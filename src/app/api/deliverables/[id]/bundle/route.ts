@@ -1,13 +1,25 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { clientsRepo, deliverablesRepo, projectsRepo } from "@/lib/repo";
 import { buildBundle } from "@/lib/bundler";
 import { record } from "@/lib/audit";
+import { applyHeaders, consume, ipFromHeaders } from "@/lib/ratelimit";
 import { notifyEventAsync } from "@/lib/wecom/notify";
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const id = Number(params.id);
   const d = deliverablesRepo.get(id);
   if (!d) return NextResponse.json({ error: "deliverable not found" }, { status: 404 });
+
+  const userId = req.headers.get("x-agentforge-user-id") || ipFromHeaders(req.headers);
+  const rl = consume({ route: "deliverable-bundle", key: userId, limit: 30, windowMs: 60 * 60 * 1000 });
+  if (!rl.ok) {
+    const res = NextResponse.json(
+      { error: "rate limited", code: "ratelimit/exceeded", retry_after_sec: rl.retryAfterSec },
+      { status: 429 },
+    );
+    applyHeaders(res.headers, rl, 30);
+    return res;
+  }
   const project = projectsRepo.get(d.project_id);
   const client = project?.client_id ? clientsRepo.get(project.client_id) : null;
   const paramsObj = deliverablesRepo.parseParams(d);

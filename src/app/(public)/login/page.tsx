@@ -1,10 +1,11 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, constantTimeEqual, expectedExp, signSession } from "@/lib/auth";
 import { record } from "@/lib/audit";
 import { getDbReady } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import { rolesRepo, usersRepo } from "@/lib/repo";
+import { consume, ipFromHeaders } from "@/lib/ratelimit";
 
 async function login(formData: FormData) {
   "use server";
@@ -13,6 +14,16 @@ async function login(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const next = String(formData.get("next") ?? "/") || "/";
   const userCount = usersRepo.count();
+
+  // Rate limit per (ip + email) AND per ip alone (defense in depth).
+  const ip = ipFromHeaders(headers());
+  const composite = `${ip}::${email || "_anon"}`;
+  const v1 = consume({ route: "login", key: composite, limit: 5, windowMs: 15 * 60 * 1000 });
+  const v2 = consume({ route: "login-ip", key: ip, limit: 20, windowMs: 15 * 60 * 1000 });
+  if (!v1.ok || !v2.ok) {
+    record({ action: "auth.fail", entity: "session", payload: { reason: "rate-limited", ip, email } });
+    return redirect(`/login?error=1&hint=rate-limited&next=${encodeURIComponent(next)}`);
+  }
 
   // Case 1: e-mail provided → multi-user login path.
   if (email) {
@@ -127,7 +138,11 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
           </label>
           {error ? (
             <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-              {hint === "no-password-env" ? "服务器未配置 AGENTFORGE_PASSWORD，且账户不存在。" : "邮箱或密码错误。"}
+              {hint === "no-password-env"
+                ? "服务器未配置 AGENTFORGE_PASSWORD，且账户不存在。"
+                : hint === "rate-limited"
+                ? "登录请求过于频繁，请 15 分钟后再试。"
+                : "邮箱或密码错误。"}
             </div>
           ) : null}
           <button
