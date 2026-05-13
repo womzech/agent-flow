@@ -18,8 +18,23 @@ function open() {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA_SQL);
+  applyAlterColumnMigrations(db);
   recordMigration(db, SCHEMA_VERSION);
   return db;
+}
+
+/**
+ * SQLite ALTER TABLE ADD COLUMN can't be guarded with IF NOT EXISTS, so we
+ * inspect pragma_table_info to add columns idempotently. Every column added
+ * after v1 lives here. Drops are not supported — we leave deprecated cols.
+ */
+function applyAlterColumnMigrations(db: Database.Database) {
+  const cols = (table: string) => (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+
+  // v4: users.totp_secret + totp_enabled (default 0)
+  const userCols = cols("users");
+  if (!userCols.includes("totp_secret")) db.exec(`ALTER TABLE users ADD COLUMN totp_secret TEXT`);
+  if (!userCols.includes("totp_enabled")) db.exec(`ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0`);
 }
 
 function recordMigration(db: Database.Database, version: number) {

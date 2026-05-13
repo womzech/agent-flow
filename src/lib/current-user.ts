@@ -2,6 +2,7 @@ import "server-only";
 
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
+import { resolvePat } from "./api-tokens";
 import { SESSION_COOKIE, verifySession } from "./auth";
 import { getDbReady } from "./db";
 import { permissionsRepo, rolesRepo, usersRepo, type Role, type User } from "./repo";
@@ -33,13 +34,28 @@ export const currentUser = cache(async (): Promise<CurrentUser | null> => {
 
   let userId: number | null = null;
 
+  // 1) Authorization: Bearer agf_xxx — programmatic API access.
   try {
-    const hdr = headers().get("x-agentforge-user-id");
-    if (hdr) userId = Number(hdr);
+    const auth = headers().get("authorization");
+    if (auth && /^Bearer\s+/i.test(auth)) {
+      const pat = auth.replace(/^Bearer\s+/i, "").trim();
+      const resolved = resolvePat(pat);
+      if (resolved) userId = resolved.userId;
+    }
   } catch {
-    /* headers() not available in some contexts (older Next); fall through */
+    /* headers() not available in some contexts; fall through */
   }
 
+  // 2) Header set by middleware after verifying session cookie.
+  if (!userId) {
+    try {
+      const hdr = headers().get("x-agentforge-user-id");
+      if (hdr) userId = Number(hdr);
+    } catch { /* see above */ }
+  }
+
+  // 3) Fall back to decoding the cookie ourselves (server actions in some
+  //    Next versions miss the middleware-injected header).
   if (!userId) {
     try {
       const cookie = cookies().get(SESSION_COOKIE)?.value;

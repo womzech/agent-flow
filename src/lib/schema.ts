@@ -8,9 +8,12 @@
  *    schema_migrations table tracks applied versions.
  *  - v3 (2026-05-13): users / roles / permissions / role_permissions tables
  *    for multi-user RBAC + wecom_userid mapping. Seeded by db.ts bootstrap.
+ *  - v4 (2026-05-14): api_tokens (PAT), login_attempts (lockout), sessions
+ *    (server-side revoke), users.totp_secret + totp_enabled (2FA), and
+ *    search_index FTS5 virtual table with triggers per entity.
  */
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS leads (
@@ -188,6 +191,44 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_wecom_userid ON users(wecom_userid);
 CREATE INDEX IF NOT EXISTS idx_users_role         ON users(role_id);
+
+-- v4: api_tokens (PAT)
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash    TEXT NOT NULL UNIQUE,
+  token_prefix  TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  last_used_at  TEXT,
+  revoked_at    TEXT,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+
+-- v4: login_attempts (lockout)
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id    INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  ip    TEXT NOT NULL DEFAULT '',
+  ok    INTEGER NOT NULL,
+  at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup ON login_attempts(email, ip, at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_at     ON login_attempts(at);
+
+-- v4: sessions (server-side revoke)
+CREATE TABLE IF NOT EXISTS sessions (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  jti          TEXT UNIQUE NOT NULL,
+  ip           TEXT NOT NULL DEFAULT '',
+  user_agent   TEXT NOT NULL DEFAULT '',
+  last_used_at TEXT NOT NULL DEFAULT (datetime('now')),
+  revoked_at   TEXT,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_jti  ON sessions(jti);
 `;
 
 /** Enums kept in TS-land for autocomplete + UI labels. */

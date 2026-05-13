@@ -31,6 +31,15 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
+  // PAT bearer: defer authentication to the route handler. PAT lookup is
+  // Node-only (uses better-sqlite3) so we can't do it here in Edge. The
+  // handler's `currentUser()` call resolves the token; if it can't, the
+  // handler returns 401.
+  const auth = req.headers.get("authorization") ?? "";
+  if (pathname.startsWith("/api/") && /^Bearer\s+/i.test(auth)) {
+    return NextResponse.next();
+  }
+
   const cookie = req.cookies.get(SESSION_COOKIE)?.value;
   const verdict = await verifySession(cookie);
   if (verdict.ok) {

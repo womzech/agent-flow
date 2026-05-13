@@ -43,6 +43,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/roles", label: "角色 / 权限", hint: "矩阵视图", require: "read:users" },
       { href: "/audit", label: "审计日志", hint: "全部状态变更", require: "read:audit" },
       { href: "/wecom", label: "企业微信", hint: "回调 / 推送", require: "write:wecom" },
+      { href: "/api-tokens", label: "API Tokens", hint: "n8n / Zapier 集成" },
       { href: "/settings", label: "Settings" },
     ],
   },
