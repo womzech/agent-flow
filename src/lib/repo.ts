@@ -119,21 +119,34 @@ export interface RevenueRow {
   memo: string;
 }
 
+function buildLeadsWhere(opts?: { q?: string; stage?: LeadStage; source?: LeadSource }): { sql: string; params: unknown[] } {
+  const conds: string[] = [];
+  const params: unknown[] = [];
+  if (opts?.q) {
+    conds.push("(name LIKE ? OR company LIKE ? OR industry LIKE ? OR pain_points LIKE ? OR contact LIKE ?)");
+    const like = `%${opts.q}%`;
+    params.push(like, like, like, like, like);
+  }
+  if (opts?.stage) { conds.push("stage = ?"); params.push(opts.stage); }
+  if (opts?.source) { conds.push("source = ?"); params.push(opts.source); }
+  return { sql: conds.length ? `WHERE ${conds.join(" AND ")}` : "", params };
+}
+
 /* ---------- Leads ---------- */
 
 export const leadsRepo = {
-  list(opts?: { q?: string; stage?: LeadStage; source?: LeadSource }): Lead[] {
-    const conds: string[] = [];
-    const params: unknown[] = [];
-    if (opts?.q) {
-      conds.push("(name LIKE ? OR company LIKE ? OR industry LIKE ? OR pain_points LIKE ? OR contact LIKE ?)");
-      const like = `%${opts.q}%`;
-      params.push(like, like, like, like, like);
-    }
-    if (opts?.stage) { conds.push("stage = ?"); params.push(opts.stage); }
-    if (opts?.source) { conds.push("source = ?"); params.push(opts.source); }
-    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
-    return getDb().prepare(`SELECT * FROM leads ${where} ORDER BY updated_at DESC, id DESC`).all(...params) as Lead[];
+  list(opts?: { q?: string; stage?: LeadStage; source?: LeadSource; limit?: number; offset?: number }): Lead[] {
+    const { sql, params } = buildLeadsWhere(opts);
+    const limitSql = typeof opts?.limit === "number" ? ` LIMIT ? OFFSET ?` : "";
+    const allParams = limitSql ? [...params, opts!.limit, opts!.offset ?? 0] : params;
+    return getDb()
+      .prepare(`SELECT * FROM leads ${sql} ORDER BY updated_at DESC, id DESC${limitSql}`)
+      .all(...allParams) as Lead[];
+  },
+  count(opts?: { q?: string; stage?: LeadStage; source?: LeadSource }): number {
+    const { sql, params } = buildLeadsWhere(opts);
+    const row = getDb().prepare(`SELECT COUNT(*) AS c FROM leads ${sql}`).get(...params) as { c: number };
+    return row.c;
   },
   get(id: number): Lead | undefined {
     return getDb().prepare("SELECT * FROM leads WHERE id = ?").get(id) as Lead | undefined;

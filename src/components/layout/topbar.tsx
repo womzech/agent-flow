@@ -8,7 +8,14 @@ export async function Topbar() {
     <header className="flex h-14 items-center justify-between border-b border-forge-line bg-forge-panel/40 px-6">
       <div className="flex items-center gap-4 text-sm text-forge-muted">
         <span className="lg:hidden font-semibold text-ink-50">AgentForge</span>
-        <span className="hidden lg:inline">销售 → 设计 → 开发 → 交付</span>
+        <form action="/search" method="get" className="hidden lg:block">
+          <input
+            type="search"
+            name="q"
+            placeholder="🔍 全局搜索 leads / clients / diagnostics..."
+            className="w-80 rounded-md border border-forge-line bg-forge px-3 py-1.5 text-sm text-ink-50 outline-none focus:border-accent-500"
+          />
+        </form>
       </div>
       <div className="flex items-center gap-2">
         <Link
