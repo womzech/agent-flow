@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #0c1325;
+  color: #e6ebf5;
+  min-height: 100vh;
+}
+
+body {
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* Markdown rendering inside diagnostic / readme views */
+.prose-forge h1,
+.prose-forge h2,
+.prose-forge h3,
+.prose-forge h4 {
+  color: #f5f7fa;
+  font-weight: 600;
+  margin: 1.4em 0 0.6em;
+}
+.prose-forge h1 { font-size: 1.6rem; }
+.prose-forge h2 { font-size: 1.3rem; border-bottom: 1px solid #26304a; padding-bottom: 0.3em; }
+.prose-forge h3 { font-size: 1.1rem; }
+.prose-forge p,
+.prose-forge li {
+  color: #c7d0dd;
+  line-height: 1.7;
+}
+.prose-forge ul,
+.prose-forge ol {
+  padding-left: 1.4em;
+  margin: 0.6em 0;
+}
+.prose-forge ul li { list-style: disc; }
+.prose-forge ol li { list-style: decimal; }
+.prose-forge strong { color: #f5f7fa; }
+.prose-forge code {
+  background: #1c2236;
+  color: #fdba74;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+.prose-forge pre {
+  background: #0f1424;
+  border: 1px solid #26304a;
+  padding: 1em;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.prose-forge pre code {
+  background: transparent;
+  color: #c7d0dd;
+  padding: 0;
+}
+.prose-forge blockquote {
+  border-left: 3px solid #f97316;
+  padding-left: 1em;
+  color: #9aa7bb;
+  margin: 0.8em 0;
+}
+.prose-forge table {
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  width: 100%;
+}
+.prose-forge th, .prose-forge td {
+  border: 1px solid #26304a;
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+.prose-forge th {
+  background: #1c2236;
+  font-weight: 600;
+}
+.prose-forge a { color: #fb923c; text-decoration: underline; }
+
+/* Subtle scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #2a3147; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #37425a; }

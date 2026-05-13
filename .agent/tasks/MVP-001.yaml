@@ -1,0 +1,33 @@
+id: MVP-001
+priority: P0
+status: completed
+owner_agent: claude
+repo: agentforge
+title: Build AgentForge v0.1 MVP — sales / design / development / delivery workbench
+scope:
+  - Next.js 14 App Router + TypeScript + Tailwind + better-sqlite3 + Anthropic SDK skeleton.
+  - Schema and repo layer for leads / clients / diagnostics / projects / blueprints / templates / deliverables / tickets / revenue.
+  - Sales: lead kanban + new/edit pages, diagnostic questionnaire, AI diagnostic generation, share token.
+  - Design: SVG-based blueprint canvas with drag + connect.
+  - Development: 7 built-in workflow templates with Python/n8n/README rendering, deliverable bundler producing zip.
+  - Delivery: project workspace tying together diagnostic, blueprint, deliverables, tickets, revenue.
+  - Dashboard + sidebar nav + pricing calculator + settings + 404.
+  - Seed script populates demo lead/client/diagnostic/project/deliverable/ticket/revenue.
+prompt_file: .agent/prompts/MVP-001.claude.md
+context_files:
+  - README.md
+  - docs/product-spec.md
+  - docs/architecture.md
+  - src/lib/schema.ts
+  - src/lib/templates.ts
+validation:
+  - npm install
+  - npm run typecheck
+  - npm run build
+  - npm run seed
+handoff:
+  - Push to github.com/womzech (new repo).
+  - Hand off via README + docs/sales-playbook.md.
+next:
+  - MVP-002 — wire WeChat-Work / DingTalk bot adapters for live deployments.
+  - MVP-003 — bring in an in-browser Python sandbox to run delivered bundles.

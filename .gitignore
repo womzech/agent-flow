@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Production
+*.log
+
+# Misc
+.DS_Store
+*.pem
+.idea/
+.vscode/
+*.swp
+
+# Local env
+.env*.local
+.env
+
+# AgentForge runtime data
+data/
+!data/.gitkeep
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Bundles
+public/bundles/
