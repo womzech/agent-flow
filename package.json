@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
     "db:reset": "rm -f data/agent-flow.db && npm run seed",
-    "test": "node --import ./tests/preamble.mjs --import tsx --test tests/*.test.ts"
+    "test": "node --import ./tests/preamble.mjs --import tsx --test tests/*.test.ts",
+    "e2e:delivery-flow": "tsx --import ./tests/preamble.mjs scripts/e2e-delivery-flow.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

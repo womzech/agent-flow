@@ -4,6 +4,7 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 const PUBLIC_PREFIXES = [
   "/login",
   "/share/",
+  "/portal/",        // Client portal: tokenized SOW view, no session required.
   "/api/health",
   "/api/wecom/",     // WeCom callback must be reachable without a session.
   "/_next/",

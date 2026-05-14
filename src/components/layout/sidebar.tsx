@@ -32,6 +32,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "交付 Delivery",
     items: [
+      { href: "/data-imports/new", label: "数据导入", hint: "CSV → 质量分析", require: "write:projects" },
       { href: "/projects", label: "项目工作区", hint: "试点 → 维护", require: "read:projects" },
       { href: "/tickets", label: "工单", hint: "月度维护", require: "read:tickets" },
     ],

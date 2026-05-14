@@ -11,9 +11,14 @@
  *  - v4 (2026-05-14): api_tokens (PAT), login_attempts (lockout), sessions
  *    (server-side revoke), users.totp_secret + totp_enabled (2FA), and
  *    search_index FTS5 virtual table with triggers per entity.
+ *  - v5 (2026-05-14): Delivery OS upgrade — business_data_imports (CSV/form
+ *    data intake + quality analysis), solution_packages (sellable method package),
+ *    statement_of_work (SOW with client portal token), acceptance_records
+ *    (signoff tracking). Enables the full lead→import→diagnosis→package→SOW→
+ *    portal→acceptance closed loop.
  */
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS leads (
@@ -229,6 +234,80 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_jti  ON sessions(jti);
+
+-- v5: business_data_imports — customer CSV / form data intake with quality analysis
+CREATE TABLE IF NOT EXISTS business_data_imports (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id            INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+  client_id             INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+  source_type           TEXT    NOT NULL DEFAULT 'csv',
+  filename              TEXT    NOT NULL DEFAULT '',
+  original_columns      TEXT    NOT NULL DEFAULT '[]',
+  inferred_schema       TEXT    NOT NULL DEFAULT '{}',
+  row_count             INTEGER NOT NULL DEFAULT 0,
+  sample_rows           TEXT    NOT NULL DEFAULT '[]',
+  data_quality_summary  TEXT    NOT NULL DEFAULT '{}',
+  created_at            TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_imports_project ON business_data_imports(project_id);
+
+-- v5: solution_packages — sellable, deliverable, verifiable method packages
+CREATE TABLE IF NOT EXISTS solution_packages (
+  id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id                  INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+  name                        TEXT    NOT NULL,
+  target_scenario             TEXT    NOT NULL DEFAULT '',
+  problem_statement           TEXT    NOT NULL DEFAULT '',
+  required_inputs             TEXT    NOT NULL DEFAULT '[]',
+  workflow_blueprint_id       INTEGER REFERENCES blueprints(id) ON DELETE SET NULL,
+  recommended_automation_steps TEXT   NOT NULL DEFAULT '[]',
+  delivery_artifacts          TEXT    NOT NULL DEFAULT '[]',
+  pricing_model               TEXT    NOT NULL DEFAULT '{}',
+  acceptance_criteria         TEXT    NOT NULL DEFAULT '[]',
+  maintenance_plan            TEXT    NOT NULL DEFAULT '{}',
+  version                     TEXT    NOT NULL DEFAULT '1.0',
+  template_slug               TEXT,
+  data_import_id              INTEGER REFERENCES business_data_imports(id) ON DELETE SET NULL,
+  created_at                  TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at                  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_packages_project ON solution_packages(project_id);
+
+-- v5: statement_of_work — SOW with portal token for client-side confirmation
+CREATE TABLE IF NOT EXISTS statement_of_work (
+  id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id                INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+  solution_package_id       INTEGER REFERENCES solution_packages(id) ON DELETE SET NULL,
+  scope_included            TEXT    NOT NULL DEFAULT '[]',
+  scope_excluded            TEXT    NOT NULL DEFAULT '[]',
+  assumptions               TEXT    NOT NULL DEFAULT '[]',
+  deliverables              TEXT    NOT NULL DEFAULT '[]',
+  timeline_weeks            INTEGER NOT NULL DEFAULT 4,
+  price_cents               INTEGER NOT NULL DEFAULT 0,
+  payment_milestones        TEXT    NOT NULL DEFAULT '[]',
+  customer_approval_status  TEXT    NOT NULL DEFAULT 'pending',
+  portal_token              TEXT    UNIQUE,
+  created_at                TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at                TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sow_project      ON statement_of_work(project_id);
+CREATE INDEX IF NOT EXISTS idx_sow_portal_token ON statement_of_work(portal_token);
+
+-- v5: acceptance_records — project signoff and handover tracking
+CREATE TABLE IF NOT EXISTS acceptance_records (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id            INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+  solution_package_id   INTEGER REFERENCES solution_packages(id) ON DELETE SET NULL,
+  accepted_features     TEXT    NOT NULL DEFAULT '[]',
+  known_limitations     TEXT    NOT NULL DEFAULT '[]',
+  excluded_items        TEXT    NOT NULL DEFAULT '[]',
+  evidence_links        TEXT    NOT NULL DEFAULT '[]',
+  customer_confirmed_at TEXT,
+  signoff_status        TEXT    NOT NULL DEFAULT 'pending',
+  created_at            TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at            TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_acceptance_project ON acceptance_records(project_id);
 `;
 
 /** Enums kept in TS-land for autocomplete + UI labels. */
@@ -319,6 +398,10 @@ export const AUDIT_ACTIONS = [
   "user.create", "user.update", "user.disable", "user.bootstrap",
   "export.csv", "export.json",
   "wecom.verify", "wecom.receive", "wecom.reply", "wecom.push", "wecom.fail",
+  "import.create",
+  "package.create",
+  "sow.create", "sow.approve",
+  "acceptance.create", "acceptance.sign",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
