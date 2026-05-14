@@ -3,6 +3,7 @@ import { sowRepo, solutionPackagesRepo, acceptanceRecordsRepo } from "@/lib/deli
 import { projectsRepo, clientsRepo } from "@/lib/repo";
 import type { PaymentMilestone } from "@/lib/delivery-os";
 import { fmtCents, fmtDate } from "@/lib/utils";
+import PortalApproveButton from "./portal-approve-button";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,11 @@ const SIGNOFF_LABELS: Record<string, string> = {
   signed: "已签署",
   rejected: "已拒绝",
 };
+
+async function approveSOW(sowId: number) {
+  "use server";
+  sowRepo.approve(sowId);
+}
 
 export default async function ClientPortalPage({ params }: { params: { token: string } }) {
   const sow = sowRepo.getByPortalToken(params.token);
@@ -90,6 +96,11 @@ export default async function ClientPortalPage({ params }: { params: { token: st
             )}
           </div>
         </div>
+
+        {/* Customer Confirmation CTA */}
+        {sow.customer_approval_status === "pending" && (
+          <PortalApproveButton approve={approveSOW.bind(null, sow.id)} />
+        )}
 
         {/* Project Overview */}
         {project && (

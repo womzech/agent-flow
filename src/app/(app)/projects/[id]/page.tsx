@@ -11,6 +11,12 @@ import {
   ticketsRepo,
 } from "@/lib/repo";
 import {
+  businessDataImportsRepo,
+  solutionPackagesRepo,
+  sowRepo,
+  acceptanceRecordsRepo,
+} from "@/lib/delivery-os";
+import {
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
   REVENUE_KINDS,
@@ -108,6 +114,10 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   const blueprints = blueprintsRepo.list(id);
   const tickets = ticketsRepo.list(id);
   const revenues = revenueRepo.list().filter((r) => r.project_id === id);
+  const dataImports = businessDataImportsRepo.list(id);
+  const packages = solutionPackagesRepo.list(id);
+  const sows = sowRepo.list(id);
+  const acceptances = acceptanceRecordsRepo.list(id);
   const totalRevenue = revenues.reduce((acc, r) => acc + r.amount_cents, 0);
   const update = updateProject.bind(null, id);
   const addDel = addDeliverable.bind(null, id);
@@ -277,6 +287,102 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
               </div>
             </Card>
           ))}
+        </div>
+      </Section>
+
+      <Section title="交付 OS" description="数据导入 → 方案包 → SOW → 验收全流程">
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Data Imports */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium uppercase tracking-wider text-forge-muted">数据导入</span>
+              <Link href={`/data-imports/new`} className="rounded bg-forge-line/60 px-2 py-0.5 text-xs hover:bg-forge-line">+ 新建</Link>
+            </div>
+            {dataImports.length === 0 ? (
+              <Card className="text-sm text-forge-muted">暂无数据导入</Card>
+            ) : dataImports.map((imp) => (
+              <Link key={imp.id} href={`/data-imports/${imp.id}`}>
+                <Card className="cursor-pointer transition hover:border-accent-500">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-ink-50">{imp.filename}</div>
+                      <div className="text-xs text-forge-muted">{imp.row_count} 行 · {imp.source_type.toUpperCase()} · {imp.created_at.slice(0, 10)}</div>
+                    </div>
+                    <Pill tone="neutral">导入</Pill>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+
+          {/* Solution Packages */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium uppercase tracking-wider text-forge-muted">方案包</span>
+            </div>
+            {packages.length === 0 ? (
+              <Card className="text-sm text-forge-muted">暂无方案包{dataImports.length > 0 ? <>，<Link href={`/data-imports/${dataImports[0].id}`} className="text-accent-400 hover:underline">从导入生成</Link></> : ""}</Card>
+            ) : packages.map((pkg) => (
+              <Link key={pkg.id} href={`/solution-packages/${pkg.id}`}>
+                <Card className="cursor-pointer transition hover:border-accent-500">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-ink-50">{pkg.name}</div>
+                      <div className="text-xs text-forge-muted">{pkg.template_slug ?? "—"} · v{pkg.version}</div>
+                    </div>
+                    <Pill tone="accent">方案</Pill>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+
+          {/* SOWs */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium uppercase tracking-wider text-forge-muted">工作说明书 SOW</span>
+            </div>
+            {sows.length === 0 ? (
+              <Card className="text-sm text-forge-muted">暂无 SOW{packages.length > 0 ? <>，<Link href={`/solution-packages/${packages[0].id}`} className="text-accent-400 hover:underline">从方案包生成</Link></> : ""}</Card>
+            ) : sows.map((sow) => (
+              <Link key={sow.id} href={`/sow/${sow.id}`}>
+                <Card className="cursor-pointer transition hover:border-accent-500">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-ink-50">¥{(sow.price_cents / 100).toLocaleString()} · {sow.timeline_weeks}周</div>
+                      <div className="text-xs text-forge-muted">{sow.created_at.slice(0, 10)}</div>
+                    </div>
+                    <Pill tone={sow.customer_approval_status === "approved" ? "success" : "warning"}>
+                      {sow.customer_approval_status === "approved" ? "已确认" : "待确认"}
+                    </Pill>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+
+          {/* Acceptance Records */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium uppercase tracking-wider text-forge-muted">验收记录</span>
+              <Link href={`/projects/${id}/acceptance`} className="rounded bg-forge-line/60 px-2 py-0.5 text-xs hover:bg-forge-line">管理</Link>
+            </div>
+            {acceptances.length === 0 ? (
+              <Card className="text-sm text-forge-muted">暂无验收记录</Card>
+            ) : acceptances.map((ar) => (
+              <Card key={ar.id}>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-ink-100">验收 #{ar.id}</div>
+                  <Pill tone={ar.signoff_status === "signed" ? "success" : "warning"}>
+                    {ar.signoff_status === "signed" ? "已签署" : "待签署"}
+                  </Pill>
+                </div>
+                {ar.customer_confirmed_at && (
+                  <div className="mt-1 text-xs text-forge-muted">签署于 {ar.customer_confirmed_at.slice(0, 10)}</div>
+                )}
+              </Card>
+            ))}
+          </div>
         </div>
       </Section>
 

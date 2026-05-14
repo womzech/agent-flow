@@ -290,6 +290,32 @@ function suggestTemplates(
   return [...new Set(slugs)];
 }
 
+/**
+ * Parse an Excel (.xlsx / .xls) file buffer into headers + rows.
+ * Uses the first worksheet. All cell values are coerced to strings.
+ */
+export function parseExcel(buffer: Buffer): { headers: string[]; rows: Record<string, string>[] } {
+  const XLSX = require("xlsx") as typeof import("xlsx"); // dynamic require — xlsx not in static imports to avoid SSR bundle cost
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) return { headers: [], rows: [] };
+  const sheet = workbook.Sheets[sheetName];
+  const raw: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  if (raw.length < 2) return { headers: [], rows: [] };
+
+  const headers = (raw[0] as unknown[]).map((h) => String(h ?? "").trim()).filter(Boolean);
+  const rows: Record<string, string>[] = [];
+  for (let i = 1; i < raw.length; i++) {
+    const cells = raw[i] as unknown[];
+    const row: Record<string, string> = {};
+    for (let j = 0; j < headers.length; j++) {
+      row[headers[j]] = String(cells[j] ?? "").trim();
+    }
+    rows.push(row);
+  }
+  return { headers, rows };
+}
+
 /** Produce a human-readable data report summary string. */
 export function formatQualitySummaryText(summary: DataQualitySummary): string {
   const parts: string[] = [];
