@@ -1,6 +1,6 @@
 {
   "name": "agent-flow",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "AI Agent consultant workbench: sales, design, development, delivery in one repo.",
   "scripts": {
@@ -11,6 +11,9 @@
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
     "db:reset": "rm -f data/agent-flow.db && npm run seed",
+    "cleanup": "tsx scripts/cleanup.ts",
+    "backup": "tsx scripts/backup.ts",
+    "doctor": "tsx scripts/doctor.ts",
     "test": "node --import ./tests/preamble.mjs --import tsx --test tests/*.test.ts",
     "e2e:delivery-flow": "tsx --import ./tests/preamble.mjs scripts/e2e-delivery-flow.ts"
   },

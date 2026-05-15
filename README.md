@@ -1,5 +1,9 @@
 # AgentFlow · 智造工坊
 
+[![CI](https://github.com/womzech/agent-flow/actions/workflows/ci.yml/badge.svg)](https://github.com/womzech/agent-flow/actions/workflows/ci.yml)
+[![Node](https://img.shields.io/badge/node-%3E%3D18.17-brightgreen)](https://nodejs.org)
+[![Version](https://img.shields.io/badge/version-0.5.1-blue)](./package.json)
+
 > 面向 AI Agent 独立顾问 / 小型团队的「销售 → 设计 → 开发 → 交付」一体化工作台。
 >
 > 灵感来自《创业产品现金流评估研究报告》中**方向 G — 企业 AI Agent 定制实施服务**：中小企业愿意为「省一个员工」的具体工作流自动化付费 3 万 - 10 万元，但顾问端需要能 1-3 周交付、可复用、可标准化报价的工具链。AgentFlow 把这套打法变成可日用的软件。
@@ -93,8 +97,11 @@ npm run dev           # 启动 http://localhost:3000
 ```bash
 npm run typecheck   # tsc --noEmit
 npm run lint        # next lint
-npm test            # node:test, 169 cases / 38 suites, 0 extra deps
+npm test            # node:test, 181 cases / 40 suites, 0 extra deps
 npm run build       # production build, 55 routes + middleware
+npm run doctor      # environment self-check (Node/.env/DB/migrations/port)
+npm run backup      # hot SQLite backup → data/backups/agent-flow-*.db
+npm run cleanup -- --dry   # preview retention cleanup (expired tokens, old sessions)
 ```
 
 CI 配置见 `.github/workflows/ci.yml`，矩阵 Node 18/20。
@@ -160,6 +167,14 @@ CI 配置见 `.github/workflows/ci.yml`，矩阵 Node 18/20。
   - Tokenized 客户 Portal（`/portal/[token]`）：客户无需登录即可在线确认 SOW
   - 验收记录（AcceptanceRecord）：签收 + 已知限制 + 证据链接
   - 注：本 Portal 为 tokenized 单页确认，不是完整客户账号登录系统
+- [x] **v0.5.1 市场对齐与生产化**（详见 [`docs/v0.6-improvement-backlog.md`](docs/v0.6-improvement-backlog.md)）：
+  - **行业模板覆盖 +43%**：新增 hr-onboarding / finance-reconciliation / ecommerce-order-routing（共 10 个模板）
+  - **Token 安全收紧**：share_token / portal_token 30 天 TTL + 顾问端撤回 + 访问统计（schema v6）
+  - **Anthropic SDK 生产化**：prompt caching（system + 模板目录）+ 指数回退重试 + 60s 超时
+  - **运维基线**：`npm run doctor` 自检 / `npm run backup` 热备 / `npm run cleanup` 数据保留
+  - **容器化**：Multi-stage Dockerfile + docker-compose.yml（详见 `docs/deploy-docker.md`）
+  - **可观测性**：结构化 JSON 日志（`src/lib/log.ts`）
+  - **模板成品化**：price-monitor / lead-intake 不再有 TODO 占位符
 - [ ] **v0.6 SaaS 化 + 完整客户账号 Portal**：客户可登录自助查看进度、提工单、付月费；多顾问工作区支持
 - [ ] **v0.7 IM 接入扩展**：钉钉 / 飞书 / Lark 接入 + 多账号
 

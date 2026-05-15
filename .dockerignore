@@ -1,0 +1,10 @@
+node_modules
+.next
+data
+.git
+.github
+.agent
+*.log
+.env.local
+.env
+.DS_Store
