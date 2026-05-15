@@ -97,7 +97,7 @@ npm run dev           # 启动 http://localhost:3000
 ```bash
 npm run typecheck   # tsc --noEmit
 npm run lint        # next lint
-npm test            # node:test, 181 cases / 40 suites, 0 extra deps
+npm test            # node:test, 179 cases / 40 suites, 0 extra deps
 npm run build       # production build, 55 routes + middleware
 npm run doctor      # environment self-check (Node/.env/DB/migrations/port)
 npm run backup      # hot SQLite backup → data/backups/agent-flow-*.db
