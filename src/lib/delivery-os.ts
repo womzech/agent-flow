@@ -63,6 +63,10 @@ export interface StatementOfWork {
   portal_token: string | null;
   created_at: string;
   updated_at: string;
+  token_expires_at: string | null;
+  token_revoked_at: string | null;
+  token_view_count: number;
+  token_last_viewed_at: string | null;
 }
 
 export interface PaymentMilestone {
@@ -281,19 +285,23 @@ export const sowRepo = {
     price_cents?: number;
     payment_milestones?: PaymentMilestone[];
     customer_approval_status?: string;
+    portal_token_ttl_days?: number;
   }): StatementOfWork {
     const now = new Date().toISOString().replace("T", " ").slice(0, 19);
     const portal_token = randomUUID();
+    const ttlDays = Math.max(1, input.portal_token_ttl_days ?? 30);
+    const token_expires_at = new Date(Date.now() + ttlDays * 86400_000).toISOString().replace("T", " ").slice(0, 19);
     const info = getDb()
       .prepare(
         `INSERT INTO statement_of_work
            (project_id, solution_package_id, scope_included, scope_excluded, assumptions,
             deliverables, timeline_weeks, price_cents, payment_milestones,
-            customer_approval_status, portal_token, created_at, updated_at)
+            customer_approval_status, portal_token, token_expires_at,
+            created_at, updated_at)
          VALUES (@project_id, @solution_package_id, @scope_included, @scope_excluded,
                  @assumptions, @deliverables, @timeline_weeks, @price_cents,
                  @payment_milestones, @customer_approval_status, @portal_token,
-                 @created_at, @updated_at)`,
+                 @token_expires_at, @created_at, @updated_at)`,
       )
       .run({
         project_id: input.project_id ?? null,
@@ -307,6 +315,7 @@ export const sowRepo = {
         payment_milestones: JSON.stringify(input.payment_milestones ?? []),
         customer_approval_status: input.customer_approval_status ?? "pending",
         portal_token,
+        token_expires_at,
         created_at: now,
         updated_at: now,
       });
@@ -318,6 +327,30 @@ export const sowRepo = {
       .prepare(`UPDATE statement_of_work SET customer_approval_status='approved', updated_at=? WHERE id=?`)
       .run(now, id);
     return this.get(id);
+  },
+  revokePortalToken(id: number): void {
+    const now = new Date().toISOString().replace("T", " ").slice(0, 19);
+    getDb()
+      .prepare(`UPDATE statement_of_work SET token_revoked_at=?, updated_at=? WHERE id=?`)
+      .run(now, now, id);
+  },
+  recordPortalView(token: string): void {
+    const now = new Date().toISOString().replace("T", " ").slice(0, 19);
+    getDb()
+      .prepare(
+        `UPDATE statement_of_work
+           SET token_view_count = token_view_count + 1, token_last_viewed_at=?
+         WHERE portal_token=?`,
+      )
+      .run(now, token);
+  },
+  /** Returns the SOW if the token is currently usable (not revoked, not expired). */
+  resolveActivePortalToken(token: string): StatementOfWork | undefined {
+    const sow = this.getByPortalToken(token);
+    if (!sow) return undefined;
+    if (sow.token_revoked_at) return undefined;
+    if (sow.token_expires_at && new Date(sow.token_expires_at.replace(" ", "T") + "Z").getTime() < Date.now()) return undefined;
+    return sow;
   },
   parseField<T>(raw: string, fallback: T): T {
     try { return JSON.parse(raw) as T; } catch { return fallback; }

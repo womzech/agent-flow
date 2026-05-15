@@ -16,9 +16,13 @@
  *    statement_of_work (SOW with client portal token), acceptance_records
  *    (signoff tracking). Enables the full lead→import→diagnosis→package→SOW→
  *    portal→acceptance closed loop.
+ *  - v6 (2026-05-16): Tokenized link hardening — add expires_at / revoked_at /
+ *    view_count / last_viewed_at to diagnostics.share_token and
+ *    statement_of_work.portal_token. Columns added idempotently via ALTER
+ *    in db.ts; no SCHEMA_SQL change.
  */
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS leads (

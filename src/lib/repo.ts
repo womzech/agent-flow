@@ -14,6 +14,12 @@ import type {
 } from "./schema";
 import { permKey } from "./schema";
 
+/** Returns true if the given DB timestamp string is in the past. NULL = never expires. */
+export function isTokenExpired(expiresAt: string | null | undefined): boolean {
+  if (!expiresAt) return false;
+  return new Date(expiresAt.replace(" ", "T") + "Z").getTime() < Date.now();
+}
+
 /** Row shapes — kept in sync with schema.ts. */
 
 export interface Lead {
@@ -60,6 +66,10 @@ export interface Diagnostic {
   model_used: string | null;
   created_at: string;
   updated_at: string;
+  token_expires_at: string | null;
+  token_revoked_at: string | null;
+  token_view_count: number;
+  token_last_viewed_at: string | null;
 }
 
 export interface Project {
@@ -290,13 +300,35 @@ export const diagnosticsRepo = {
       .run(next);
     return next;
   },
-  ensureShareToken(id: number): string {
+  ensureShareToken(id: number, opts?: { ttlDays?: number }): string {
     const current = this.get(id);
     if (!current) throw new Error(`diagnostic ${id} not found`);
-    if (current.share_token) return current.share_token;
-    const token = randomUUID();
-    this.update(id, { share_token: token });
+    if (current.share_token && !current.token_revoked_at && !isTokenExpired(current.token_expires_at)) return current.share_token;
+    const token = current.share_token || randomUUID();
+    const ttlDays = Math.max(1, opts?.ttlDays ?? 30);
+    const expires = new Date(Date.now() + ttlDays * 86400_000).toISOString().replace("T", " ").slice(0, 19);
+    getDb().prepare(
+      `UPDATE diagnostics
+         SET share_token=?, token_expires_at=?, token_revoked_at=NULL, updated_at=?
+       WHERE id=?`,
+    ).run(token, expires, new Date().toISOString().replace("T", " ").slice(0, 19), id);
     return token;
+  },
+  revokeShareToken(id: number): void {
+    getDb().prepare(
+      `UPDATE diagnostics SET token_revoked_at=?, updated_at=? WHERE id=?`,
+    ).run(
+      new Date().toISOString().replace("T", " ").slice(0, 19),
+      new Date().toISOString().replace("T", " ").slice(0, 19),
+      id,
+    );
+  },
+  recordShareView(token: string): void {
+    getDb().prepare(
+      `UPDATE diagnostics
+         SET token_view_count = token_view_count + 1, token_last_viewed_at=?
+       WHERE share_token=?`,
+    ).run(new Date().toISOString().replace("T", " ").slice(0, 19), token);
   },
   recommendedTemplates(d: Diagnostic): string[] {
     try {

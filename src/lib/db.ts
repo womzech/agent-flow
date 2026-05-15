@@ -35,6 +35,16 @@ function applyAlterColumnMigrations(db: Database.Database) {
   const userCols = cols("users");
   if (!userCols.includes("totp_secret")) db.exec(`ALTER TABLE users ADD COLUMN totp_secret TEXT`);
   if (!userCols.includes("totp_enabled")) db.exec(`ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0`);
+
+  // v6: tokenized-link hardening — expires_at / revoked_at / view_count / last_viewed_at
+  // on diagnostics (share_token) and statement_of_work (portal_token).
+  for (const table of ["diagnostics", "statement_of_work"] as const) {
+    const c = cols(table);
+    if (!c.includes("token_expires_at")) db.exec(`ALTER TABLE ${table} ADD COLUMN token_expires_at TEXT`);
+    if (!c.includes("token_revoked_at")) db.exec(`ALTER TABLE ${table} ADD COLUMN token_revoked_at TEXT`);
+    if (!c.includes("token_view_count")) db.exec(`ALTER TABLE ${table} ADD COLUMN token_view_count INTEGER NOT NULL DEFAULT 0`);
+    if (!c.includes("token_last_viewed_at")) db.exec(`ALTER TABLE ${table} ADD COLUMN token_last_viewed_at TEXT`);
+  }
 }
 
 function recordMigration(db: Database.Database, version: number) {

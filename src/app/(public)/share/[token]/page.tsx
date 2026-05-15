@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { diagnosticsRepo } from "@/lib/repo";
+import { diagnosticsRepo, isTokenExpired } from "@/lib/repo";
 import { fmtCents, fmtDate, renderMarkdown } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +7,17 @@ export const dynamic = "force-dynamic";
 export default function SharedDiagnosticPage({ params }: { params: { token: string } }) {
   const d = diagnosticsRepo.getByShareToken(params.token);
   if (!d || !d.report_markdown) notFound();
+  if (d.token_revoked_at || isTokenExpired(d.token_expires_at)) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-16 text-center">
+        <h1 className="mb-3 text-xl font-semibold text-ink-50">链接已失效</h1>
+        <p className="text-sm text-forge-muted">
+          此分享链接已 {d.token_revoked_at ? "被撤回" : "过期"}。请联系您的顾问获取新链接。
+        </p>
+      </div>
+    );
+  }
+  diagnosticsRepo.recordShareView(params.token);
   if (d.status === "ready") diagnosticsRepo.update(d.id, { status: "shared" });
 
   return (

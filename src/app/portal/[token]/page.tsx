@@ -27,6 +27,17 @@ async function approveSOW(sowId: number) {
 export default async function ClientPortalPage({ params }: { params: { token: string } }) {
   const sow = sowRepo.getByPortalToken(params.token);
   if (!sow) notFound();
+  if (sow.token_revoked_at || (sow.token_expires_at && new Date(sow.token_expires_at.replace(" ", "T") + "Z").getTime() < Date.now())) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-16 text-center text-slate-100">
+        <h1 className="mb-3 text-xl font-semibold">链接已失效</h1>
+        <p className="text-sm text-slate-400">
+          此客户门户链接已 {sow.token_revoked_at ? "被顾问撤回" : "过期"}。请联系您的顾问获取新链接。
+        </p>
+      </div>
+    );
+  }
+  sowRepo.recordPortalView(params.token);
 
   const project = sow.project_id ? projectsRepo.get(sow.project_id) : null;
   const client = project?.client_id ? clientsRepo.get(project.client_id) : null;

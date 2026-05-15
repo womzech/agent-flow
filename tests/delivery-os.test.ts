@@ -297,4 +297,52 @@ describe("delivery-os: repositories", () => {
     const total = (input.payment_milestones ?? []).reduce((s, m) => s + m.amount_cents, 0);
     assert.equal(total, 800000, "milestones should sum to total price");
   });
+
+  it("creates SOW with portal_token_ttl_days and exposes expiry", () => {
+    const sow = dos.sowRepo.create({ price_cents: 100000, timeline_weeks: 2, portal_token_ttl_days: 1 });
+    assert.ok(sow.token_expires_at, "should record token_expires_at");
+    const ms = new Date(sow.token_expires_at!.replace(" ", "T") + "Z").getTime() - Date.now();
+    assert.ok(ms > 0 && ms < 2 * 86400_000, "expires within 2 days");
+    const active = dos.sowRepo.resolveActivePortalToken(sow.portal_token!);
+    assert.equal(active?.id, sow.id, "active token resolves");
+  });
+
+  it("revokePortalToken makes resolveActivePortalToken return undefined", () => {
+    const sow = dos.sowRepo.create({ price_cents: 100000, timeline_weeks: 2 });
+    dos.sowRepo.revokePortalToken(sow.id);
+    const active = dos.sowRepo.resolveActivePortalToken(sow.portal_token!);
+    assert.equal(active, undefined);
+    const direct = dos.sowRepo.getByPortalToken(sow.portal_token!);
+    assert.ok(direct?.token_revoked_at, "revoked_at should be set");
+  });
+
+  it("recordPortalView increments token_view_count + sets last_viewed_at", () => {
+    const sow = dos.sowRepo.create({ price_cents: 100000, timeline_weeks: 2 });
+    dos.sowRepo.recordPortalView(sow.portal_token!);
+    dos.sowRepo.recordPortalView(sow.portal_token!);
+    const reread = dos.sowRepo.getByPortalToken(sow.portal_token!);
+    assert.equal(reread?.token_view_count, 2);
+    assert.ok(reread?.token_last_viewed_at);
+  });
+
+  it("diagnostic share token: revoke + recordShareView", () => {
+    const d = repo.diagnosticsRepo.create({ title: "test-share", questionnaire: {}, lead_id: null, client_id: null });
+    const token = repo.diagnosticsRepo.ensureShareToken(d.id, { ttlDays: 7 });
+    repo.diagnosticsRepo.recordShareView(token);
+    let reread = repo.diagnosticsRepo.get(d.id);
+    assert.equal(reread?.token_view_count, 1);
+    assert.ok(reread?.token_expires_at);
+    repo.diagnosticsRepo.revokeShareToken(d.id);
+    reread = repo.diagnosticsRepo.get(d.id);
+    assert.ok(reread?.token_revoked_at, "should be revoked");
+  });
+
+  it("isTokenExpired handles null + past + future", () => {
+    assert.equal(repo.isTokenExpired(null), false);
+    assert.equal(repo.isTokenExpired(undefined), false);
+    const past = new Date(Date.now() - 86400_000).toISOString().replace("T", " ").slice(0, 19);
+    const future = new Date(Date.now() + 86400_000).toISOString().replace("T", " ").slice(0, 19);
+    assert.equal(repo.isTokenExpired(past), true);
+    assert.equal(repo.isTokenExpired(future), false);
+  });
 });
