@@ -64,7 +64,7 @@ accompanying README.md before running.
 import os
 import sys
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 `;
 
 export const TEMPLATES: Template[] = [
@@ -132,8 +132,19 @@ def extract_fields(raw: str) -> Dict[str, Any]:
     return json.loads(text[start : end + 1])
 
 def write_to_sheet(record: Dict[str, Any]) -> None:
-    # TODO: 替换为客户实际的表格 API（飞书 / 钉钉宜搭 / Google Sheets）
-    print("[sheet] would write:", record, "→", SHEET_URL)
+    """写入目标表格。默认通过 HTTP POST JSON 上送（飞书多维表格 / 钉钉宜搭 / Sheety / Apps Script 均兼容）。
+    定制对接：替换 _write_via_http 或新增 _write_via_feishu / _write_via_dingtalk。"""
+    import urllib.request
+    body = json.dumps({"fields": record}, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(SHEET_URL, data=body, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"[sheet] wrote record → status={resp.status}")
+    except Exception as e:
+        # 网络失败不阻塞通知；落到本地 jsonl 兜底，方便补录
+        with open("lead_intake_failed.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"record": record, "error": str(e)}, ensure_ascii=False) + "\\n")
+        print(f"[sheet] FAILED → buffered to lead_intake_failed.jsonl: {e}")
 
 def notify(record: Dict[str, Any]) -> None:
     import urllib.request
@@ -750,22 +761,65 @@ if __name__ == "__main__":
       { key: "threshold", label: "波动阈值", default: "3%" },
     ],
     pythonTemplate: `${COMMON_PYTHON_HEADER}
+import os
+import sqlite3
 import urllib.request
 
 MATERIALS = "{{materials}}".split(",")
 ALERT_WEBHOOK = "{{alertChannel}}"
-THRESHOLD = "{{threshold}}"
+THRESHOLD_PCT = float("{{threshold}}".strip("%")) / 100.0
+DATA_SOURCE_URL = os.environ.get("PRICE_DATA_SOURCE", "")  # 客户授权的数据源 base URL
+DB_PATH = os.environ.get("PRICE_DB", "prices.db")
+
+def _init_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("CREATE TABLE IF NOT EXISTS prices (material TEXT, price REAL, fetched_at TEXT)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_prices_mat_at ON prices(material, fetched_at)")
+    conn.commit()
+    return conn
 
 def fetch_price(material: str) -> float:
-    # TODO: 替换为客户授权的数据源
-    return 0.0
+    """从客户授权数据源拉取最新报价。PRICE_DATA_SOURCE 未配置时回退到 stub（仅供 demo）。
+    生产环境应根据数据源协议改写（如造价信息站 token / 上海钢联 API / 自建抓取代理）。"""
+    if not DATA_SOURCE_URL:
+        return 0.0
+    url = f"{DATA_SOURCE_URL}?material={urllib.parse.quote(material)}"
+    with urllib.request.urlopen(url, timeout=10) as r:
+        data = json.loads(r.read().decode("utf-8"))
+    return float(data.get("price", 0.0))
+
+def last_price(conn: sqlite3.Connection, material: str) -> Optional[float]:
+    row = conn.execute("SELECT price FROM prices WHERE material=? ORDER BY fetched_at DESC LIMIT 1", (material,)).fetchone()
+    return row[0] if row else None
+
+def alert(material: str, prev: float, curr: float) -> None:
+    pct = (curr - prev) / prev * 100 if prev else 0
+    body = json.dumps({"msgtype": "text", "text": {"content": f"⚠️ {material} 价格波动 {pct:+.1f}%（{prev} → {curr}）"}}).encode("utf-8")
+    req = urllib.request.Request(ALERT_WEBHOOK, data=body, headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        print(f"[alert] FAILED for {material}: {e}", file=sys.stderr)
 
 def main() -> int:
+    conn = _init_db()
     rows = []
     for m in MATERIALS:
-        rows.append({"material": m, "price": fetch_price(m)})
+        m = m.strip()
+        if not m:
+            continue
+        try:
+            curr = fetch_price(m)
+        except Exception as e:
+            print(f"[fetch] FAILED {m}: {e}", file=sys.stderr)
+            continue
+        prev = last_price(conn, m)
+        conn.execute("INSERT INTO prices VALUES (?, ?, datetime('now'))", (m, curr))
+        if prev and prev > 0 and abs(curr - prev) / prev >= THRESHOLD_PCT:
+            alert(m, prev, curr)
+        rows.append({"material": m, "price": curr, "prev": prev})
+    conn.commit()
     print(json.dumps(rows, ensure_ascii=False))
-    # TODO: persist to sqlite + alert if exceed threshold
     return 0
 
 if __name__ == "__main__":
@@ -816,6 +870,473 @@ crontab -e
 - 监控材料：{{materials}}
 - 异常阈值：{{threshold}}
 - 报警 Webhook：{{alertChannel}}
+`,
+  },
+
+  {
+    slug: "hr-onboarding",
+    name: "员工入职流程自动化",
+    short: "入职申请 → AI 核对资料完整性 → 多系统账号开通 → 入职任务派发 → 进度看板",
+    industry: ["通用", "科技", "服务业", "制造"],
+    complexity: "medium",
+    estDays: 7,
+    priceCents: [800000, 1500000],
+    monthlyCents: [80000, 150000],
+    inputs: [
+      "现有入职 checklist 模板 + 上一年度 5-10 份历史案例",
+      "需开通的系统清单（钉钉/企业微信、邮箱、OA、专用工具账号），及对应管理员/接口",
+      "IT/行政/财务的责任人对应表",
+      "新员工首日所需材料（合同、保密、应聘登记等）",
+    ],
+    outputs: [
+      "Python 主控脚本（资料校验 + 任务派发 + 进度跟踪）",
+      "n8n 工作流（钉钉/企业微信审批触发 → 多分支动作）",
+      "HR 操作手册 + 例外处理 SOP",
+    ],
+    excludes: [
+      "不接管劳动合同电子签（建议对接法大大 / e 签宝）",
+      "不直接开通需人工审核的特权账号（如生产系统）",
+      "不替代 HRBP 与员工的入职沟通",
+    ],
+    pricingNote: "复杂度由接入系统数决定：≤3 套系统走低端；>5 套或需自定义审批走中高端。",
+    roi: {
+      headline: "HR 单次入职操作 4-6 小时 → 30 分钟；漏掉账号导致的首日空转下降 90%",
+      formula: "ROI = 每月入职人数 × 节省 4 小时 × HR 时薪 + 减少首日空转的隐性成本",
+    },
+    params: [
+      { key: "systems", label: "需开通系统（逗号分隔）", default: "钉钉,企业邮箱,OA,工时系统" },
+      { key: "approver", label: "审批人钉钉/企微 ID", default: "hr_lead" },
+      { key: "checklistUrl", label: "checklist 模板 URL", default: "https://example.com/hr/checklist.json" },
+      { key: "alertWebhook", label: "异常告警 Webhook", default: "https://oapi.dingtalk.com/robot/send?access_token=XXX" },
+    ],
+    pythonTemplate: `${COMMON_PYTHON_HEADER}
+import urllib.request
+import anthropic
+
+SYSTEMS = "{{systems}}".split(",")
+APPROVER = "{{approver}}"
+CHECKLIST_URL = "{{checklistUrl}}"
+ALERT_WEBHOOK = "{{alertWebhook}}"
+
+VALIDATE_PROMPT = (
+    "你是 HR 入职助手。检查下面候选人的入职资料是否完整。"
+    "必备字段：姓名、身份证号、入职日期、岗位、紧急联系人、银行卡号。"
+    "缺哪些就用 JSON 列出 missing 数组；都齐则 missing 为空。"
+)
+
+def load_checklist() -> List[Dict[str, Any]]:
+    with urllib.request.urlopen(CHECKLIST_URL, timeout=10) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+def validate(applicant: Dict[str, Any]) -> List[str]:
+    client = anthropic.Anthropic()
+    msg = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=400,
+        messages=[{"role": "user", "content": VALIDATE_PROMPT + "\\n\\n资料：\\n" + json.dumps(applicant, ensure_ascii=False)}],
+    )
+    text = msg.content[0].text  # type: ignore
+    start, end = text.find("{"), text.rfind("}")
+    return json.loads(text[start:end + 1]).get("missing", []) if start >= 0 else []
+
+def provision(applicant: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """逐个系统下发开通工单。集成方式按客户实际系统改写。"""
+    out = []
+    for sys_name in SYSTEMS:
+        sys_name = sys_name.strip()
+        if not sys_name:
+            continue
+        # Stub: 真实集成时按目标 API 重写。这里仅记录待办。
+        out.append({"system": sys_name, "applicant": applicant.get("name"), "status": "queued"})
+    return out
+
+def notify(payload: Dict[str, Any]) -> None:
+    body = json.dumps({"msgtype": "text", "text": {"content": json.dumps(payload, ensure_ascii=False)}}).encode("utf-8")
+    req = urllib.request.Request(ALERT_WEBHOOK, data=body, headers={"Content-Type": "application/json"})
+    urllib.request.urlopen(req, timeout=5)
+
+def main() -> int:
+    applicant = json.loads(sys.stdin.read())
+    missing = validate(applicant)
+    if missing:
+        notify({"applicant": applicant.get("name"), "stage": "blocked", "missing": missing, "approver": APPROVER})
+        print(json.dumps({"status": "blocked", "missing": missing}, ensure_ascii=False))
+        return 1
+    tasks = provision(applicant)
+    notify({"applicant": applicant.get("name"), "stage": "provisioned", "tasks": tasks})
+    print(json.dumps({"status": "ok", "tasks": tasks}, ensure_ascii=False, indent=2))
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())
+`,
+    n8nTemplate: {
+      name: "AgentFlow - hr-onboarding",
+      nodes: [
+        { name: "DingTalk Approval Trigger", type: "n8n-nodes-base.webhook", parameters: { path: "hr-onboarding" }, position: [200, 200] },
+        { name: "AI Validate", type: "n8n-nodes-base.httpRequest", parameters: { url: "https://api.anthropic.com/v1/messages" }, position: [500, 200] },
+        { name: "Has Missing?", type: "n8n-nodes-base.if", position: [800, 200] },
+        { name: "Provision Accounts", type: "n8n-nodes-base.httpRequest", position: [1100, 100] },
+        { name: "Notify HR", type: "n8n-nodes-base.httpRequest", position: [1100, 300] },
+      ],
+      connections: {
+        "DingTalk Approval Trigger": { main: [[{ node: "AI Validate", type: "main", index: 0 }]] },
+        "AI Validate": { main: [[{ node: "Has Missing?", type: "main", index: 0 }]] },
+        "Has Missing?": {
+          main: [
+            [{ node: "Notify HR", type: "main", index: 0 }],
+            [{ node: "Provision Accounts", type: "main", index: 0 }],
+          ],
+        },
+      },
+    },
+    readmeTemplate: `# 员工入职流程自动化
+
+> 为 {{clientName}} 定制 · {{generatedAt}}
+
+## 工作模式
+
+1. HRBP 在钉钉/企微提交入职审批（候选人 JSON）。
+2. AI 核对资料完整性，缺字段 → 退回 HR 补；齐全 → 进入开通。
+3. 系统按 {{systems}} 列表逐项下发开通工单。
+4. 完成后推送 {{approver}} 入职清单。
+
+## 上线建议
+
+- 第 1 周建议「开通工单生成」与「实际下发」分离，HR 人工 confirm 后再下发。
+- 第 2 周接入审批通过即自动下发。
+- 高风险系统（财务/生产）永远走人工。
+`,
+  },
+
+  {
+    slug: "finance-reconciliation",
+    name: "银行流水多源对账",
+    short: "银行 CSV + 内部账单 → AI 模糊匹配（金额+时间+对方+摘要）→ 差异表 → 财务复核",
+    industry: ["财务", "电商", "服务业", "供应链"],
+    complexity: "medium",
+    estDays: 7,
+    priceCents: [600000, 1200000],
+    monthlyCents: [80000, 150000],
+    inputs: [
+      "银行流水样本（≥3 个月，每月 ≥100 条）",
+      "内部账单样本（订单系统 / ERP 导出 / 手工台账）",
+      "对账规则（按金额/订单号/客户名/备注等的匹配优先级）",
+    ],
+    outputs: [
+      "Python 对账脚本（fuzzy 匹配 + 报告生成 Excel）",
+      "n8n 定时工作流（每日凌晨拉两边流水 → 出对账报告）",
+      "财务复核手册 + 异常 case 库",
+    ],
+    excludes: [
+      "不直接调整账务（仅出差异报告供财务人工核销）",
+      "不替代税务系统接口；只做内部对账",
+      "不承诺 100% 自动匹配；目标 80%+ 自动 + 20% 人工",
+    ],
+    pricingNote: "数据 schema 差异是工作量大头。电商订单清晰的客户 6 万就够；线下混合账客户得 10 万起。",
+    roi: {
+      headline: "财务月底对账从 3-5 天压缩到 4-8 小时；漏账 / 错账金额下降 80%",
+      formula: "ROI = 财务人天节省 + 漏账金额 × 发现概率提升",
+    },
+    params: [
+      { key: "bankCsvPath", label: "银行流水 CSV 路径", default: "./input/bank_statement.csv" },
+      { key: "ledgerCsvPath", label: "内部账单 CSV 路径", default: "./input/internal_ledger.csv" },
+      { key: "outputDir", label: "对账结果输出目录", default: "./output" },
+      { key: "amountToleranceCents", label: "金额容差（分）", default: "100" },
+    ],
+    pythonTemplate: `${COMMON_PYTHON_HEADER}
+import csv
+import datetime as dt
+from pathlib import Path
+import anthropic
+
+BANK_CSV = Path("{{bankCsvPath}}")
+LEDGER_CSV = Path("{{ledgerCsvPath}}")
+OUTPUT_DIR = Path("{{outputDir}}")
+TOLERANCE_CENTS = int("{{amountToleranceCents}}")
+
+def load_csv(path: Path) -> List[Dict[str, Any]]:
+    with path.open(encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+def to_cents(amount: str) -> int:
+    return round(float(str(amount).replace(",", "").strip() or 0) * 100)
+
+def match_rule_based(bank: List[Dict[str, Any]], ledger: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    """精确匹配：金额相等（容差内）且日期相邻 ≤ 2 天。"""
+    matched, unmatched_bank, unmatched_ledger = [], [], []
+    used = set()
+    for b in bank:
+        b_amt = to_cents(b.get("金额") or b.get("amount") or 0)
+        b_date = b.get("日期") or b.get("date") or ""
+        hit = None
+        for i, l in enumerate(ledger):
+            if i in used:
+                continue
+            l_amt = to_cents(l.get("金额") or l.get("amount") or 0)
+            if abs(b_amt - l_amt) > TOLERANCE_CENTS:
+                continue
+            l_date = l.get("日期") or l.get("date") or ""
+            if abs((_parse(b_date) - _parse(l_date)).days) <= 2:
+                hit = (i, l)
+                break
+        if hit:
+            used.add(hit[0])
+            matched.append({"bank": b, "ledger": hit[1], "method": "rule"})
+        else:
+            unmatched_bank.append(b)
+    for i, l in enumerate(ledger):
+        if i not in used:
+            unmatched_ledger.append(l)
+    return {"matched": matched, "unmatched_bank": unmatched_bank, "unmatched_ledger": unmatched_ledger}
+
+def _parse(s: str) -> dt.date:
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y"):
+        try:
+            return dt.datetime.strptime(s.strip()[:10], fmt).date()
+        except Exception:
+            continue
+    return dt.date(1900, 1, 1)
+
+def ai_match_remaining(unmatched_bank: List[Dict[str, Any]], unmatched_ledger: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """剩余条目交给 LLM 做模糊（金额接近 / 摘要语义 / 对方名相似）配对。"""
+    if not unmatched_bank or not unmatched_ledger:
+        return []
+    client = anthropic.Anthropic()
+    prompt = (
+        "下面是银行流水里没匹配上的条目和内部账单里没匹配上的条目，"
+        "请基于金额接近、对方名相似、摘要语义找出可能成对的条目。"
+        "用 JSON 数组返回：[{bank_idx, ledger_idx, confidence: 0-1, reason}]。confidence < 0.6 不要返回。"
+    )
+    payload = json.dumps({"bank": unmatched_bank[:30], "ledger": unmatched_ledger[:30]}, ensure_ascii=False)
+    msg = client.messages.create(model="claude-sonnet-4-6", max_tokens=1200, messages=[{"role": "user", "content": prompt + "\\n\\n" + payload}])
+    text = msg.content[0].text  # type: ignore
+    start, end = text.find("["), text.rfind("]")
+    return json.loads(text[start:end + 1]) if start >= 0 else []
+
+def write_report(result: Dict[str, Any]) -> Path:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out = OUTPUT_DIR / f"recon-{dt.date.today().isoformat()}.json"
+    out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
+
+def main() -> int:
+    bank = load_csv(BANK_CSV)
+    ledger = load_csv(LEDGER_CSV)
+    rule = match_rule_based(bank, ledger)
+    ai = ai_match_remaining(rule["unmatched_bank"], rule["unmatched_ledger"])
+    path = write_report({"summary": {"matched_rule": len(rule["matched"]), "matched_ai": len(ai), "unmatched_bank": len(rule["unmatched_bank"]) - len(ai), "unmatched_ledger": len(rule["unmatched_ledger"]) - len(ai)}, "rule_matches": rule["matched"], "ai_matches": ai, "unmatched_bank": rule["unmatched_bank"], "unmatched_ledger": rule["unmatched_ledger"]})
+    print(f"[recon] report → {path}")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())
+`,
+    n8nTemplate: {
+      name: "AgentFlow - finance-reconciliation",
+      nodes: [
+        { name: "Cron Nightly", type: "n8n-nodes-base.cron", position: [200, 200] },
+        { name: "Fetch Bank CSV", type: "n8n-nodes-base.httpRequest", position: [500, 100] },
+        { name: "Fetch Ledger CSV", type: "n8n-nodes-base.httpRequest", position: [500, 300] },
+        { name: "Run Recon Script", type: "n8n-nodes-base.executeCommand", position: [800, 200] },
+        { name: "Email Report", type: "n8n-nodes-base.emailSend", position: [1100, 200] },
+      ],
+      connections: {
+        "Cron Nightly": {
+          main: [
+            [{ node: "Fetch Bank CSV", type: "main", index: 0 }],
+            [{ node: "Fetch Ledger CSV", type: "main", index: 0 }],
+          ],
+        },
+        "Fetch Bank CSV": { main: [[{ node: "Run Recon Script", type: "main", index: 0 }]] },
+        "Fetch Ledger CSV": { main: [[{ node: "Run Recon Script", type: "main", index: 0 }]] },
+        "Run Recon Script": { main: [[{ node: "Email Report", type: "main", index: 0 }]] },
+      },
+    },
+    readmeTemplate: `# 银行流水多源对账
+
+> 为 {{clientName}} 定制 · {{generatedAt}}
+
+## 工作模式
+
+1. 每天凌晨拉一次银行流水与内部账单（CSV）。
+2. 规则匹配（金额容差 ≤ {{amountToleranceCents}} 分 + 日期 ±2 天）。
+3. 剩余项交给 LLM 做模糊匹配（置信度 ≥0.6 才记入 ai_matches）。
+4. 输出 JSON 报告到 {{outputDir}}，邮件发送给财务。
+
+## 上线建议
+
+- 第 1 周用样本数据跑回测，统计自动匹配率。<70% 时调整匹配规则。
+- 财务对照规则匹配（高置信）+ AI 匹配（中置信）+ 未匹配（低置信），分组复核。
+- 持续把"被人工修正的 ai_matches"做成 prompt 例子，迭代提示词。
+`,
+  },
+
+  {
+    slug: "ecommerce-order-routing",
+    name: "多平台订单聚合分发",
+    short: "淘宝/抖音/拼多多/微店 → 统一订单格式 → 库存校验 → 仓库分仓 → 物流推送",
+    industry: ["电商", "新零售"],
+    complexity: "complex",
+    estDays: 14,
+    priceCents: [1500000, 4000000],
+    monthlyCents: [150000, 400000],
+    inputs: [
+      "客户已对接的平台清单 + 对应商家中心账号（或 API 凭证）",
+      "现有仓库清单 + 各仓 SKU 库存源（Excel 或 WMS API）",
+      "分仓规则（按地区 / 按 SKU / 按平台优先级）",
+      "物流商对应表（顺丰 / 京东 / 通达系 API key 或电子面单平台）",
+    ],
+    outputs: [
+      "Python 订单聚合服务（4 平台 webhook / 拉单脚本 + 统一订单 schema）",
+      "n8n 工作流（订单进库 → 校验 → 路由 → 出物流单号）",
+      "运营手册 + 异常订单 SOP（断货 / 地址异常 / 加急）",
+    ],
+    excludes: [
+      "不直接修改平台后台订单状态（避免触发风控）；仅做出库回写",
+      "不处理售后退款流程（建议另立模板）",
+      "不替代 WMS / OMS；若客户无 WMS 建议先小规模试运行",
+    ],
+    pricingNote: "平台数量 × 仓库数量决定接口工作量。3 平台 1 仓走 1.5 万；4+ 平台多仓走 3-4 万。",
+    roi: {
+      headline: "订单处理 1-2 min → 5 sec，发货错误率从 3% 降到 <0.5%",
+      formula: "ROI = 日均订单量 × 节省每单时间 + 错发率下降带来的退货成本节省",
+    },
+    params: [
+      { key: "platforms", label: "接入平台（逗号分隔）", default: "taobao,douyin,pdd,weidian" },
+      { key: "warehouses", label: "仓库列表（逗号分隔）", default: "GZ-HQ,SH-NORTH,CD-WEST" },
+      { key: "routingRule", label: "分仓规则", default: "region" },
+      { key: "logisticsWebhook", label: "电子面单平台 API", default: "https://api.kdniao.com/api/eorderservice" },
+    ],
+    pythonTemplate: `${COMMON_PYTHON_HEADER}
+import urllib.request
+
+PLATFORMS = "{{platforms}}".split(",")
+WAREHOUSES = "{{warehouses}}".split(",")
+ROUTING_RULE = "{{routingRule}}"
+LOGISTICS_WEBHOOK = "{{logisticsWebhook}}"
+
+# 简化的统一订单 schema；真实集成应使用 Pydantic 校验。
+UnifiedOrder = Dict[str, Any]
+
+def fetch_orders(platform: str) -> List[UnifiedOrder]:
+    """拉取该平台未发货订单。各平台 API 不同，需逐个实现 _fetch_<platform>()。"""
+    fn = globals().get(f"_fetch_{platform}")
+    if not fn:
+        print(f"[fetch] no fetcher for {platform}", file=sys.stderr)
+        return []
+    return fn()
+
+def _fetch_taobao() -> List[UnifiedOrder]:
+    # 真实接入：调用淘宝开放平台 taobao.trades.sold.get
+    return []
+
+def _fetch_douyin() -> List[UnifiedOrder]:
+    return []
+
+def _fetch_pdd() -> List[UnifiedOrder]:
+    return []
+
+def _fetch_weidian() -> List[UnifiedOrder]:
+    return []
+
+def check_stock(order: UnifiedOrder, warehouse: str) -> bool:
+    """库存校验。真实集成应调 WMS API；本 stub 默认 True。"""
+    return True
+
+def route(order: UnifiedOrder) -> str:
+    if ROUTING_RULE == "region":
+        # 简单按收货省份匹配；真实业务用 ProvinceCode → WarehouseCode 映射表。
+        prov = order.get("province", "")
+        if prov.startswith("广") or prov.startswith("海"):
+            return WAREHOUSES[0]
+        if prov.startswith("上") or prov.startswith("江") or prov.startswith("浙"):
+            return WAREHOUSES[1] if len(WAREHOUSES) > 1 else WAREHOUSES[0]
+        return WAREHOUSES[-1]
+    if ROUTING_RULE == "platform":
+        return WAREHOUSES[hash(order.get("platform", "")) % len(WAREHOUSES)]
+    return WAREHOUSES[0]
+
+def request_waybill(order: UnifiedOrder, warehouse: str) -> Optional[str]:
+    """向电子面单平台申请运单号。失败返回 None，由调用方决定是否重试。"""
+    payload = {"order_id": order.get("order_id"), "warehouse": warehouse, "to": order.get("address")}
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(LOGISTICS_WEBHOOK, data=body, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read().decode("utf-8"))
+            return data.get("waybill_no")
+    except Exception as e:
+        print(f"[waybill] FAILED {order.get('order_id')}: {e}", file=sys.stderr)
+        return None
+
+def main() -> int:
+    summary = {"fetched": 0, "routed": 0, "out_of_stock": 0, "waybill_failed": 0}
+    for p in PLATFORMS:
+        orders = fetch_orders(p.strip())
+        summary["fetched"] += len(orders)
+        for o in orders:
+            wh = route(o)
+            if not check_stock(o, wh):
+                summary["out_of_stock"] += 1
+                continue
+            wb = request_waybill(o, wh)
+            if wb:
+                summary["routed"] += 1
+            else:
+                summary["waybill_failed"] += 1
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())
+`,
+    n8nTemplate: {
+      name: "AgentFlow - ecommerce-order-routing",
+      nodes: [
+        { name: "Cron 5min", type: "n8n-nodes-base.cron", position: [200, 200] },
+        { name: "Pull Taobao", type: "n8n-nodes-base.httpRequest", position: [500, 50] },
+        { name: "Pull Douyin", type: "n8n-nodes-base.httpRequest", position: [500, 150] },
+        { name: "Pull PDD", type: "n8n-nodes-base.httpRequest", position: [500, 250] },
+        { name: "Pull Weidian", type: "n8n-nodes-base.httpRequest", position: [500, 350] },
+        { name: "Merge + Normalize", type: "n8n-nodes-base.functionItem", position: [800, 200] },
+        { name: "Stock + Route", type: "n8n-nodes-base.functionItem", position: [1100, 200] },
+        { name: "Request Waybill", type: "n8n-nodes-base.httpRequest", parameters: { url: "{{logisticsWebhook}}" }, position: [1400, 200] },
+      ],
+      connections: {
+        "Cron 5min": {
+          main: [
+            [{ node: "Pull Taobao", type: "main", index: 0 }],
+            [{ node: "Pull Douyin", type: "main", index: 0 }],
+            [{ node: "Pull PDD", type: "main", index: 0 }],
+            [{ node: "Pull Weidian", type: "main", index: 0 }],
+          ],
+        },
+        "Pull Taobao": { main: [[{ node: "Merge + Normalize", type: "main", index: 0 }]] },
+        "Pull Douyin": { main: [[{ node: "Merge + Normalize", type: "main", index: 0 }]] },
+        "Pull PDD": { main: [[{ node: "Merge + Normalize", type: "main", index: 0 }]] },
+        "Pull Weidian": { main: [[{ node: "Merge + Normalize", type: "main", index: 0 }]] },
+        "Merge + Normalize": { main: [[{ node: "Stock + Route", type: "main", index: 0 }]] },
+        "Stock + Route": { main: [[{ node: "Request Waybill", type: "main", index: 0 }]] },
+      },
+    },
+    readmeTemplate: `# 多平台订单聚合分发
+
+> 为 {{clientName}} 定制 · {{generatedAt}}
+
+## 工作模式
+
+1. 每 5 分钟轮询 {{platforms}} 平台未发货订单。
+2. 归一到统一 schema，校验库存（{{warehouses}}）。
+3. 按 {{routingRule}} 规则分仓。
+4. 调电子面单平台获取运单号，回写各平台后台。
+
+## 上线建议
+
+- 第 1 周仅做"拉单 + 归一 + 路由建议"，不写回平台。运营人工 confirm。
+- 第 2 周开启自动写回，但保留 30 分钟撤回窗口。
+- 加急 / VIP 订单永远走人工。
+- 平台风控敏感，建议每个平台账号每分钟 API 调用 < 10 次。
 `,
   },
 ];
