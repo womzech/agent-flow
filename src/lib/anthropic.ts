@@ -1,18 +1,58 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { TEMPLATES, templateSummary } from "./templates";
+import { log } from "./log";
 
 let _client: Anthropic | undefined;
+let _testClient: unknown = null;
 
 export function anthropic(): Anthropic {
+  if (_testClient) return _testClient as Anthropic;
   if (!_client) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set. See .env.example.");
-    _client = new Anthropic({ apiKey });
+    _client = new Anthropic({ apiKey, maxRetries: 0, timeout: 60_000 });
   }
   return _client;
 }
 
+/** Test seam — override the SDK with a fake. Call __setClientForTest(null) to restore. */
+export function __setClientForTest(client: unknown): void {
+  _testClient = client;
+}
+
 export const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+
+const REQUEST_TIMEOUT_MS = Number(process.env.ANTHROPIC_TIMEOUT_MS) || 60_000;
+const MAX_ATTEMPTS = Math.max(1, Number(process.env.ANTHROPIC_MAX_ATTEMPTS) || 3);
+
+function isRetriableError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { status?: number; name?: string; code?: string };
+  if (e.status === 429) return true;
+  if (typeof e.status === "number" && e.status >= 500) return true;
+  if (e.name === "APIConnectionTimeoutError" || e.name === "APIConnectionError") return true;
+  if (e.code === "ECONNRESET" || e.code === "ETIMEDOUT") return true;
+  return false;
+}
+
+async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt === MAX_ATTEMPTS || !isRetriableError(err)) {
+        log.error("anthropic.call.failed", { label, attempt, err: String(err) });
+        throw err;
+      }
+      const backoffMs = Math.min(1000 * 2 ** (attempt - 1), 8000);
+      log.warn("anthropic.call.retry", { label, attempt, backoffMs, err: String(err) });
+      await new Promise((r) => setTimeout(r, backoffMs));
+    }
+  }
+  throw lastErr;
+}
 
 export interface DiagnosticQuestionnaire {
   company: {
@@ -99,13 +139,36 @@ const SYSTEM_PROMPT = `你是 AI 工作流诊断顾问。客户是中小企业�
 export async function generateDiagnostic(q: DiagnosticQuestionnaire, opts?: { model?: string }): Promise<DiagnosticResult> {
   const model = opts?.model || DEFAULT_MODEL;
   const templateCatalog = TEMPLATES.map((t) => "- " + templateSummary(t)).join("\n");
-  const userMsg = `客户问卷（JSON）：\n\`\`\`json\n${JSON.stringify(q, null, 2)}\n\`\`\`\n\n可用模板库：\n${templateCatalog}\n\n请生成诊断报告。`;
 
-  const resp = await anthropic().messages.create({
+  // Prompt caching: system prompt + template catalog stay near-constant across
+  // every diagnostic. Mark them as cache_control=ephemeral so they get a 5-min
+  // TTL discount on subsequent calls. Only the questionnaire JSON is "hot".
+  const systemBlocks = [
+    { type: "text" as const, text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" as const } },
+    { type: "text" as const, text: `可用模板库：\n${templateCatalog}`, cache_control: { type: "ephemeral" as const } },
+  ];
+  const userMsg = `客户问卷（JSON）：\n\`\`\`json\n${JSON.stringify(q, null, 2)}\n\`\`\`\n\n请基于「可用模板库」生成诊断报告。`;
+
+  const t0 = Date.now();
+  const resp = await withRetry("generateDiagnostic", () =>
+    anthropic().messages.create(
+      {
+        model,
+        max_tokens: 3500,
+        system: systemBlocks,
+        messages: [{ role: "user", content: userMsg }],
+      },
+      { timeout: REQUEST_TIMEOUT_MS },
+    ),
+  );
+  const usage = (resp as unknown as { usage?: { cache_read_input_tokens?: number; cache_creation_input_tokens?: number; input_tokens?: number; output_tokens?: number } }).usage ?? {};
+  log.info("anthropic.diagnostic.done", {
     model,
-    max_tokens: 3500,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userMsg }],
+    ms: Date.now() - t0,
+    input: usage.input_tokens,
+    output: usage.output_tokens,
+    cache_read: usage.cache_read_input_tokens,
+    cache_creation: usage.cache_creation_input_tokens,
   });
 
   const text = resp.content
