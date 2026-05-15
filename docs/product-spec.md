@@ -1,7 +1,7 @@
 # AgentFlow 产品规格
 
-> 版本：v0.1 (MVP)
-> 上一次更新：2026-05-13
+> 版本：v0.5 (Delivery OS)
+> 上一次更新：2026-05-15
 
 ## 1. 用户画像
 
@@ -13,6 +13,8 @@
 **次要用户 P2（路线图后期）**：AI Agent 服务商创始人。要管理多个顾问，多个客户。
 
 ## 2. 用户旅程
+
+### 2.1 完整销售→交付旅程
 
 ```
 潜在客户线索（朋友圈 / 闲鱼 / 知乎私信）
@@ -35,21 +37,82 @@
         Maintenance：月费 1000-5000 元/月，提供工单 + 优化
 ```
 
+### 2.2 Delivery OS 交付闭环旅程（v0.5）
+
+```
+客户上传历史数据（CSV / Excel）
+        ↓
+  /data-imports/new — 解析字段 + 数据质量分析
+  （总行数、缺失率、SLA 违规、推荐模板）
+        ↓
+  /solution-packages — AI 辅助生成方案包
+  （目标场景、问题陈述、自动化步骤、验收标准、报价模型）
+        ↓
+  /sow — 生成 SOW（工作说明书）
+  （范围确认、里程碑付款、客户 portal token）
+        ↓
+  /portal/[token] — 客户在线确认 SOW（tokenized，无需登录）
+        ↓
+  /projects/[id]/acceptance — 验收记录
+  （已接受功能、已知限制、证据链接、客户签收）
+```
+
 ## 3. 数据模型概览
 
-详见 `src/lib/schema.ts`。九张表：
+详见 `src/lib/schema.ts`（当前 `SCHEMA_VERSION = 5`）。按域分组：
+
+### Sales（销售）
 
 | 表 | 含义 | 关键字段 |
 |---|---|---|
-| `leads` | 销售线索 | name, company, industry, stage, source, pain_points, contact, created_at |
-| `clients` | 成交客户（从 lead 转化） | name, company, industry, billing_email, ... |
-| `diagnostics` | 诊断报告 | client_id, questionnaire_json, report_markdown, status, pricing_quote_cents |
-| `projects` | 项目 | client_id, name, status, project_fee_cents, monthly_fee_cents, started_at |
+| `leads` | 销售线索 | name, company, industry, stage, source, pain_points, contact |
+| `clients` | 成交客户（从 lead 转化） | name, company, industry, billing_email |
+| `diagnostics` | 诊断报告 | client_id, questionnaire_json, report_markdown, status, share_token |
+| `revenue_log` | 收入记录 | project_id, kind (diagnostic\|project\|monthly\|other), amount_cents |
+
+### Delivery（交付）
+
+| 表 | 含义 | 关键字段 |
+|---|---|---|
+| `projects` | 项目 | client_id, name, status, project_fee_cents, monthly_fee_cents |
 | `blueprints` | 工作流蓝图 | project_id, name, spec_json |
-| `templates` | 工作流模板（内置 + 自建） | slug, name, category, industry, complexity, est_days, price_range, body_json |
-| `deliverables` | 交付物 | project_id, template_slug, params_json, bundle_path, delivered_at |
+| `deliverables` | 交付物 | project_id, template_slug, params_json, bundle_path |
 | `tickets` | 工单 | project_id, title, body, status, priority |
-| `revenue_log` | 收入记录 | project_id, kind (project|monthly), amount_cents, paid_at |
+
+### Delivery OS（v0.5 新增）
+
+| 表 | 含义 | 关键字段 |
+|---|---|---|
+| `business_data_imports` | 客户数据导入（CSV/Excel） | filename, original_columns, inferred_schema, row_count, data_quality_summary |
+| `solution_packages` | 可售方案包 | name, target_scenario, problem_statement, acceptance_criteria, pricing_model |
+| `statement_of_work` | SOW（工作说明书） | scope_included, scope_excluded, price_cents, payment_milestones, portal_token |
+| `acceptance_records` | 验收记录 | accepted_features, known_limitations, signoff_status, customer_confirmed_at |
+
+### Security / RBAC（v0.3 – v0.4）
+
+| 表 | 含义 | 关键字段 |
+|---|---|---|
+| `users` | 用户账号 | email, name, password_hash, role_id, totp_secret, totp_enabled |
+| `roles` | 角色定义 | name, description, is_system |
+| `permissions` | 权限条目 | action (read\|write), resource |
+| `role_permissions` | 角色↔权限映射 | role_id, permission_id |
+| `sessions` | 服务端 session（支持撤销） | user_id, jti, ip, revoked_at |
+| `api_tokens` | PAT（Personal Access Token） | user_id, token_hash, token_prefix, name |
+| `login_attempts` | 登录记录（账号锁定用） | email, ip, ok, at |
+
+### Integration / Ops
+
+| 表 | 含义 | 关键字段 |
+|---|---|---|
+| `templates` | 工作流模板（内置 + 自建） | slug, name, category, industry, complexity, body_json |
+| `settings` | 系统配置 k/v | key, value |
+| `audit_log` | 审计日志 | actor, action, entity, entity_id, payload_json |
+| `schema_migrations` | Schema 版本追踪 | version, applied_at |
+
+> **搜索索引**：FTS5 虚拟表 `search_index`（trigram tokenizer）在进程内懒初始化，
+> 当前覆盖 leads / clients / diagnostics / projects 四类实体。
+> Delivery OS 实体（business_data_imports / solution_packages / statement_of_work / acceptance_records）
+> 尚未并入 FTS5，列入 v0.6 backlog。
 
 ## 4. 关键页面
 
@@ -66,40 +129,57 @@
 
 ### 4.3 诊断报告 `/diagnostics/new` 与 `/diagnostics/[id]`
 
-- New：分步问卷
-  - Step 1：客户基本信息（行业、规模、年营收区间）
-  - Step 2：高频重复工作流（最多 3 个，每个填名称 + 现状耗时 + 频次 + 参与人数）
-  - Step 3：现有系统（CRM/ERP/Excel/微信群 等多选）
-  - Step 4：预算意愿（一次性预算、月度预算）
-- 生成后跳转 `/diagnostics/[id]`：
-  - 渲染 Markdown 报告
-  - 「分享链接」按钮（生成只读 token URL）
-  - 「转项目」按钮
+- New：分步问卷（行业/规模/痛点/系统/预算）
+- 生成后：渲染 Markdown 报告、「分享链接」按钮、「转项目」按钮
 
 ### 4.4 Blueprint 编辑器 `/blueprints/[id]`
 
 - 左侧：节点库（trigger、ai-step、http-call、condition、output）
-- 中间：画布（用 SVG + 拖拽，不依赖 React Flow 等重组件）
+- 中间：画布（SVG + 拖拽，不依赖 React Flow 等重组件）
 - 右侧：节点详情面板（编辑参数）
-- 顶部：Save / Export YAML
 
 ### 4.5 Template Library `/templates`
 
-- 网格视图：每张卡片显示模板 logo、名称、行业、复杂度、预计交付天数、推荐价格
-- 点击进入详情：完整说明 + 输入 / 输出 / 适用场景
+- 网格视图：每张卡片显示模板名称、行业、复杂度、预计交付天数、推荐价格
+- 点击进入详情：完整说明 + 输入/输出/适用场景
 
 ### 4.6 Project Workspace `/projects/[id]`
 
-- Tab 切换：Overview / Diagnostic / Blueprint / Deliverables / Tickets / Revenue
-- Overview 上半部分：客户名片 + 项目状态 + KPI（已收款、未收款、工单数）
+- Tab 切换：Overview / Diagnostic / Blueprint / Deliverables / Tickets / Revenue / Delivery OS
+- Delivery OS tab 展示项目关联的 import / package / SOW / acceptance
 
-### 4.7 Settings `/settings`
+### 4.7 Delivery OS 页面（v0.5）
 
-- Anthropic API key
-- 默认模型（claude-sonnet-4-6 或其他）
+- `/data-imports/new`：上传 CSV 或 Excel，实时展示字段推断 + 数据质量报告
+- `/data-imports/[id]`：详情页，含建议的方案模板
+- `/solution-packages/[id]`：方案包详情，含报价模型与验收标准
+- `/sow/[id]`：SOW 详情，含里程碑付款计划与 portal token
+- `/portal/[token]`：**公开页**，客户通过 token 链接在线确认 SOW（无需登录账号）
+- `/projects/[id]/acceptance`：验收记录，客户签收后锁定
+
+### 4.8 Security & Admin
+
+- `/security`：账号安全总览（会话管理、2FA 状态、登录历史）
+- `/security/2fa`：TOTP 二步验证设置
+- `/security/sessions`：所有活跃 session，支持单条撤销
+- `/users` / `/users/[id]`：多用户管理（owner 专属）
+- `/roles`：角色权限矩阵查看
+- `/audit`：审计日志（按实体/操作过滤，分页）
+- `/api-tokens`：PAT 管理（生成 / 撤销，用于 n8n / Zapier）
+
+### 4.9 Global Search `/search`
+
+- FTS5 trigram 全文搜索，覆盖 leads / clients / diagnostics / projects
+- 按当前用户权限过滤可见实体
+- 结果带高亮片段
+
+### 4.10 Settings `/settings`
+
+- Anthropic API key 配置
+- 默认模型选择
 - 顾问个人信息（用于诊断报告署名）
 
-## 5. 模板库（v0.1 内置）
+## 5. 模板库
 
 | Slug | 名称 | 行业 | 复杂度 | 预计天数 | 推荐价格 |
 |---|---|---|---|---|---|
@@ -111,33 +191,27 @@
 | customer-service | 客服问题自动分类与回复 | 电商 / 服务业 | 中等 | 7 | ¥6,000 - ¥12,000 |
 | price-monitor | 工程材料价格监控 | 工程 / 制造 | 中等 | 7 | ¥8,000 - ¥18,000 |
 
-每个模板包含：
-
-- `description`：业务场景说明
-- `inputs`：客户需提供的资料（如「3 个月历史询盘 Excel」）
-- `outputs`：交付给客户的产物
-- `python_template`：参数化的 Python 脚本骨架
-- `n8n_template`：对应的 n8n 工作流 JSON 骨架
-- `readme_template`：客户侧使用手册 Markdown 骨架
-- `roi_calc`：ROI 计算公式（用于诊断报告引用）
+每个模板包含：`description` / `inputs` / `outputs` / `python_template` / `n8n_template` / `readme_template` / `roi_calc`。
 
 ## 6. AI 集成点
 
 | 场景 | 模型 | 输入 | 输出 |
 |---|---|---|---|
 | 诊断报告生成 | claude-sonnet-4-6 | 问卷 JSON + 模板库摘要 | Markdown 诊断报告 |
-| Blueprint 自动建议（v0.2+） | claude-sonnet-4-6 | 工作流描述 | 节点 JSON |
+| Blueprint 自动建议 | claude-sonnet-4-6 | 工作流描述 | 节点 JSON |
 | README 自动撰写 | claude-haiku-4-5 | 项目元数据 + 模板内容 | 客户手册 Markdown |
-| 工单优先级 / 摘要（v0.2+） | claude-haiku-4-5 | 工单原文 | priority + summary |
+| 工单优先级 / 摘要 | claude-haiku-4-5 | 工单原文 | priority + summary |
+| 企业微信意图路由 | claude-haiku-4-5 | 用户消息 | slash 命令 + 实体 JSON |
+| 数据导入质量分析 | claude-sonnet-4-6（计划） | data_quality_summary | 自然语言分析建议（当前为规则引擎） |
 
-## 7. 非目标（v0.1 不做）
+## 7. 非目标（v0.5 当前不做）
 
-- 不做客户侧 Portal —— 客户侧只能看分享链接，不能登录
-- 不做多用户 SaaS —— 单机部署，单顾问使用
-- 不做工作流的实际执行 —— Bundler 产物给客户自己跑（n8n / Python）
-- 不做支付集成 —— revenue_log 是手动记账
-- 不做账号 / 鉴权 —— 假设单用户，在 NEXT_PUBLIC_AGENT_TOKEN 这一层做简单 token 校验
+- 不做完整客户账号登录 Portal — 当前 `/portal/[token]` 是 tokenized 单页确认，不是账号体系
+- 不做多租户 SaaS — 单机部署，单顾问团队使用；无跨租户数据隔离
+- 不做工作流的实际执行 — Bundler 产物给客户自己跑（n8n / Python）
+- 不做支付集成 — `revenue_log` 是手动记账
+- Delivery OS 实体（imports / packages / SOW / acceptance）尚未接入 FTS5 全文搜索
 
 ## 8. 后续迭代
 
-见 README 的「路线图」一节。
+见 README 的「路线图」一节（v0.6 SaaS 化 + 完整客户账号 Portal，v0.7 IM 接入扩展）。

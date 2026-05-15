@@ -105,6 +105,55 @@ describe("data-import: CSV parsing", () => {
   });
 });
 
+describe("data-import: parseExcel", () => {
+  let di: typeof import("../src/lib/data-import");
+
+  before(async () => {
+    di = await import("../src/lib/data-import");
+  });
+
+  it("parses a minimal xlsx buffer into headers + rows", async () => {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["name", "score"],
+      ["Alice", 95],
+      ["Bob", 87],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    const { headers, rows } = di.parseExcel(buf);
+    assert.deepEqual(headers, ["name", "score"]);
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].name, "Alice");
+    assert.equal(rows[1].name, "Bob");
+    assert.equal(rows[1].score, "87");
+  });
+
+  it("coerces numeric cell values to strings", async () => {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet([["price", "qty"], [9800, 3]]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    const { rows } = di.parseExcel(buf);
+    assert.equal(typeof rows[0].price, "string");
+    assert.equal(rows[0].price, "9800");
+    assert.equal(rows[0].qty, "3");
+  });
+
+  it("returns empty when sheet has only a header row (no data)", async () => {
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.aoa_to_sheet([["col1", "col2"]]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    const { headers, rows } = di.parseExcel(buf);
+    assert.equal(headers.length, 0);
+    assert.equal(rows.length, 0);
+  });
+});
+
 describe("delivery-os: repositories", () => {
   let dos: typeof import("../src/lib/delivery-os");
   let di: typeof import("../src/lib/data-import");

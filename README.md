@@ -54,6 +54,12 @@ AgentFlow 围绕这四点，把顾问每天要做的事情结构化：
 - **Project Workspace**：把客户、诊断、蓝图、交付物、工单、月费记录关联在一起
 - **Deliverable Bundler**：一键打包 Python 脚本 + n8n JSON + Markdown 手册的 zip
 - **Maintenance Tickets**：客户反馈进入工单系统，按月对账
+- **Delivery OS**（v0.5）：
+  - 客户数据导入（CSV / Excel .xlsx 上传 → 字段推断 → 数据质量分析）
+  - 方案包（SolutionPackage）：结构化的可售方案，含验收标准 + 报价模型
+  - SOW（工作说明书）：范围确认、里程碑付款、Tokenized Portal 链接（`/portal/[token]`）
+  - 客户 Portal 确认：客户通过 token 链接在线确认 SOW（无需登录账号）
+  - 验收记录（AcceptanceRecord）：完整签收 + 已知限制 + 证据链接
 
 ## 技术栈
 
@@ -62,6 +68,7 @@ AgentFlow 围绕这四点，把顾问每天要做的事情结构化：
 - **数据库**：SQLite via `better-sqlite3`（零运维，单文件）
 - **AI**：Anthropic Claude API（`@anthropic-ai/sdk`），默认 `claude-sonnet-4-6`
 - **打包**：原生 Node `archiver`（交付包 zip）
+- **Excel 解析**：`xlsx`（Delivery OS Excel 上传的明确例外；CSV-only 降低 UX，手写解析器不可靠，该例外不再扩大）
 
 依赖刻意控制在个位数包，方便 fork 后改造。
 
@@ -79,15 +86,15 @@ npm run dev           # 启动 http://localhost:3000
 ```
 
 启动后访问 `/login` 用密码登录。所有 `/(app)/*` 与 `/api/*` 路由都被中间件保护；
-`/share/<token>` 与 `/api/health` 公开，便于把诊断报告分享给客户、把健康检查暴露给监控。
+`/share/<token>`、`/portal/<token>` 与 `/api/health` 公开，便于把诊断报告分享给客户、SOW 发给客户确认、健康检查暴露给监控。
 
 ### 验证
 
 ```bash
 npm run typecheck   # tsc --noEmit
 npm run lint        # next lint
-npm test            # node:test, 58 cases, 0 new deps
-npm run build       # production build, 28 routes + middleware
+npm test            # node:test, 169 cases / 38 suites, 0 extra deps
+npm run build       # production build, 55 routes + middleware
 ```
 
 CI 配置见 `.github/workflows/ci.yml`，矩阵 Node 18/20。
@@ -128,26 +135,33 @@ CI 配置见 `.github/workflows/ci.yml`，矩阵 Node 18/20。
 ## 路线图
 
 - [x] **v0.1 MVP**：CRM-lite + 诊断生成 + Blueprint + Template + Bundler
-- [x] **v0.2 企业级硬化**（见 `CHANGELOG.md`）：
+- [x] **v0.2 企业级硬化**：
   - 单租户鉴权（HMAC 签名 cookie）+ 审计日志 + Schema migrations + Health endpoint
   - 58 个测试用例（基于 `node:test`，零新依赖）+ GitHub Actions CI
   - Clients CRUD + 列表搜索过滤 + 数据 CSV/JSON 导出 + 打印友好诊断版
   - 统一 API 错误形状 + Error/loading boundaries + 性能索引
-- [x] **v0.4 Security & Scale hardening**（详见 `CHANGELOG.md` 与 `docs/v0.4-hardening-design.md`）：
+- [x] **v0.3 多用户 + RBAC + 企业微信**：
+  - 4 个内置角色 × 22 条权限 + PBKDF2 密码 + 签名 cookie 多用户 session
+  - 企业微信自建应用：URL 验证 + 收消息 + 异步 LLM 回复 + 主动推送
+  - 6 个 slash 命令 + Claude 中文意图路由
+  - `/users` `/roles` `/wecom` 管理 UI + 全程审计
+- [x] **v0.4 Security & Scale hardening**（详见 `docs/v0.4-hardening-design.md`）：
   - Token-bucket rate limiting：login / WeCom / AI generate / bundle / TOTP
-  - Double-submit CSRF tokens；logout 改 POST-only + GET 返回 405
+  - Double-submit CSRF tokens；logout 改 POST-only
   - API tokens (PAT) — n8n / Zapier 集成；plaintext 仅显示一次
   - Account lockout + 服务端 session 撤销 + 登录历史 UI
   - 2FA TOTP (RFC 6238)，两步登录，5 分钟 pending cookie
   - SQLite FTS5 trigram 全局搜索（CJK 友好，按权限过滤）
   - 分页 utility + `/security` 总览页
-- [x] **v0.3 多用户 + RBAC + 企业微信**（详见 `CHANGELOG.md` 与 `docs/wecom-rbac-design.md`）：
-  - 4 个内置角色 × 22 条权限 + PBKDF2 密码 + 签名 cookie 多用户 session
-  - 企业微信自建应用：URL 验证 + 收消息 + 异步 LLM 回复 + 主动推送
-  - 6 个 slash 命令 + Claude 中文意图路由
-  - `/users` `/roles` `/wecom` 管理 UI + 全程审计
-- [ ] **v0.4**：客户侧 Portal（客户可看进度、提工单、付月费）
-- [ ] **v0.5**：多账号 SaaS 化（一个顾问服务 N 家客户）+ 钉钉 / 飞书 / Lark 接入
+- [x] **v0.5 Delivery OS**：
+  - 客户数据导入（CSV / Excel）→ 字段推断 → 数据质量分析
+  - 方案包（SolutionPackage）：可售方案结构，含验收标准 + 报价模型
+  - SOW（工作说明书）：范围确认、里程碑付款
+  - Tokenized 客户 Portal（`/portal/[token]`）：客户无需登录即可在线确认 SOW
+  - 验收记录（AcceptanceRecord）：签收 + 已知限制 + 证据链接
+  - 注：本 Portal 为 tokenized 单页确认，不是完整客户账号登录系统
+- [ ] **v0.6 SaaS 化 + 完整客户账号 Portal**：客户可登录自助查看进度、提工单、付月费；多顾问工作区支持
+- [ ] **v0.7 IM 接入扩展**：钉钉 / 飞书 / Lark 接入 + 多账号
 
 ## License
 

@@ -21,6 +21,7 @@ AgentFlow 是「企业 AI Agent 定制实施服务」的顾问端工作台。读
 - **以销售→设计→开发→交付四阶段组织**：每个 feature 必须明确归属哪个阶段。横跨阶段的工具（如 Project Workspace）要把四阶段串成单一时间线。
 - **模板优先**：客户场景千变万化，但常见模式不多。每解决一个客户问题，先想能不能沉淀成模板。
 - **依赖最小化**：除 Next.js / Tailwind / better-sqlite3 / Anthropic SDK / archiver 外不引入新 npm 包。需要新增依赖时先在 PR 里说明替代方案为什么不行。
+  **例外**：`xlsx` 已在 v0.5 Delivery OS Excel 数据导入中明确引入（客户上传 .xlsx 是常见场景，手写解析器不可靠，CSV-only 降低 UX），该例外不再扩大，后续新增依赖仍需说明理由。
 - **数据库可见性**：所有数据放 SQLite 单文件 `data/agent-flow.db`，schema 用 TypeScript 集中维护。任何字段变更要更新 `src/lib/schema.ts` 顶部的 CHANGELOG 注释。
 - **API 路由薄**：业务逻辑放 `src/lib/`，API 路由只做参数校验 + 转发 + 序列化。
 
