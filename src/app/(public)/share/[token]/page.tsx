@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { diagnosticsRepo, isTokenExpired } from "@/lib/repo";
 import { fmtCents, fmtDate, renderMarkdown } from "@/lib/utils";
+import { ComplianceFooter } from "@/components/layout/compliance-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,7 @@ export default function SharedDiagnosticPage({ params }: { params: { token: stri
       <div className="mt-10 border-t border-forge-line pt-6 text-center text-xs text-forge-muted">
         本报告仅供决策参考。最终方案以双方签署的服务合同为准。
       </div>
+      <ComplianceFooter className="mt-4" />
     </div>
   );
 }

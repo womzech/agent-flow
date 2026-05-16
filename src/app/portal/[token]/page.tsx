@@ -4,6 +4,7 @@ import { projectsRepo, clientsRepo } from "@/lib/repo";
 import type { PaymentMilestone } from "@/lib/delivery-os";
 import { fmtCents, fmtDate } from "@/lib/utils";
 import PortalApproveButton from "./portal-approve-button";
+import { ComplianceFooter } from "@/components/layout/compliance-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -312,6 +313,7 @@ export default async function ClientPortalPage({ params }: { params: { token: st
         {/* Footer */}
         <footer className="border-t border-slate-800 pt-6 text-center text-xs text-slate-500">
           本页面由 AgentFlow 生成 · 如有问题，请联系您的项目顾问 · {fmtDate(sow.created_at)}
+          <ComplianceFooter className="mt-2" />
         </footer>
       </main>
     </div>

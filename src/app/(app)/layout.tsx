@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { ComplianceFooter } from "@/components/layout/compliance-footer";
 
 /**
  * All authenticated pages depend on per-request session state (via
@@ -16,6 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1 flex-col">
         <Topbar />
         <main className="flex-1 overflow-x-hidden p-6 lg:p-8">{children}</main>
+        <ComplianceFooter className="border-t border-forge-line/40 px-6 py-2" />
       </div>
     </div>
   );
