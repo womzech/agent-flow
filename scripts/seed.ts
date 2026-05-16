@@ -18,6 +18,13 @@ import {
   ticketsRepo,
 } from "../src/lib/repo";
 import { fallbackDiagnostic } from "../src/lib/anthropic";
+import {
+  acceptanceRecordsRepo,
+  businessDataImportsRepo,
+  solutionPackagesRepo,
+  sowRepo,
+} from "../src/lib/delivery-os";
+import { parseCSV, analyzeQuality } from "../src/lib/data-import";
 
 const RESET = process.argv.includes("--reset");
 
@@ -231,6 +238,83 @@ function main() {
     memo: "试点项目首期 50%",
   });
 
+  // ---- Delivery OS demo (data import → solution package → SOW → acceptance) ----
+  const csv =
+    "inquiry_id,customer,product_code,quantity,response_time_hours,status\n" +
+    "INQ-1001,Dubai Mall Group,P4-OUTDOOR-20SQM,1,2,replied\n" +
+    "INQ-1002,Riyadh Trade,P6-OUTDOOR-15SQM,2,6,replied\n" +
+    "INQ-1003,Cairo Events,P3-INDOOR-8SQM,1,,pending\n" +
+    "INQ-1004,Doha Stadium,P8-OUTDOOR-50SQM,1,12,replied\n" +
+    "INQ-1005,Muscat Hotel,P4-OUTDOOR-12SQM,3,4,replied\n";
+  const parsed = parseCSV(csv);
+  const quality = analyzeQuality(parsed.headers, parsed.rows);
+  const dataImport = businessDataImportsRepo.create({
+    project_id: project.id,
+    client_id: client1.id,
+    source_type: "csv",
+    filename: "inquiries-Q1-2026.csv",
+    original_columns: parsed.headers,
+    inferred_schema: quality.columns,
+    row_count: parsed.rows.length,
+    sample_rows: parsed.rows.slice(0, 3),
+    data_quality_summary: quality,
+  });
+
+  const pkg = solutionPackagesRepo.create({
+    project_id: project.id,
+    name: "外贸询盘自动回复方案包 v1",
+    target_scenario: "阿里国际站 / 邮件询盘自动起草回复 + 人工审核",
+    problem_statement:
+      "近 90 天 200+ 询盘平均响应 6 小时；新业务员需 4 周才能独立回询盘。" +
+      "目标：响应中位数 ≤2 小时，新人 2 周内独立处理 80% 询盘。",
+    required_inputs: ["3 个月历史询盘样本", "产品目录 + 标准报价表", "1 个业务员 × 2 小时上线培训"],
+    recommended_automation_steps: [
+      "解析询盘（规格 / 数量 / 目的地 / 预算）",
+      "向产品库 + 历史回复库做语义检索",
+      "Claude 生成中/英双语回复草稿",
+      "推送企业微信审稿群，业务员一键发出",
+    ],
+    delivery_artifacts: ["Python 主控脚本", "n8n 工作流 JSON", "运营手册 + FAQ", "首月使用培训 2 次"],
+    acceptance_criteria: ["回复草稿采用率 ≥80%", "响应中位数 ≤2h", "客户回询率 +20%"],
+    pricing_model: { recommended_cents: 4000000, recommended_monthly_cents: 150000, est_days: 14 },
+    maintenance_plan: { months: 6, scope: "每月 1 次 prompt 调优 + 1 次商品库更新" },
+    template_slug: "inquiry-reply",
+    data_import_id: dataImport.id,
+  });
+
+  const sow = sowRepo.create({
+    project_id: project.id,
+    solution_package_id: pkg.id,
+    scope_included: [
+      "中/英双语回复草稿（其他语种 v2 再加）",
+      "产品库 + 历史询盘 RAG 索引",
+      "企业微信审稿群推送",
+      "首月每周一次 QA + 培训",
+    ],
+    scope_excluded: ["不接管 CRM 长期客户跟进", "不承诺成交率提升", "不替代财务 / 法务流程"],
+    assumptions: ["客户提供至少 200 条历史询盘 + 当前在售产品目录", "业务员每周可投入 2 小时审稿与反馈"],
+    deliverables: ["Python 主程序 + requirements", "n8n 工作流 JSON", "操作手册", "首月 2 次培训"],
+    timeline_weeks: 3,
+    price_cents: 4000000,
+    payment_milestones: [
+      { label: "签约首付", pct: 50, amount_cents: 2000000, due: "2026-05-20" },
+      { label: "上线验收", pct: 40, amount_cents: 1600000, due: "2026-06-15" },
+      { label: "稳定运行 30 天", pct: 10, amount_cents: 400000, due: "2026-07-15" },
+    ],
+    customer_approval_status: "pending",
+    portal_token_ttl_days: 14,
+  });
+
+  acceptanceRecordsRepo.create({
+    project_id: project.id,
+    solution_package_id: pkg.id,
+    accepted_features: ["中文回复草稿", "英文回复草稿", "企业微信推送"],
+    known_limitations: ["阿拉伯语支持需 v2", "图片型号识别准确率 ~70%（v2 优化）"],
+    excluded_items: ["不替代 CRM 客户跟进"],
+    evidence_links: ["上线运行截图（内部钉钉）", "QA 周报 v1.md"],
+    signoff_status: "pending",
+  });
+
   console.log("[seed] inserted demo data:");
   console.log(`  - leads: ${leadsRepo.list().length}`);
   console.log(`  - clients: ${clientsRepo.list().length}`);
@@ -238,6 +322,11 @@ function main() {
   console.log(`  - projects: ${projectsRepo.list().length}`);
   console.log(`  - deliverables: ${deliverablesRepo.list().length}`);
   console.log(`  - revenue rows: ${revenueRepo.list().length}`);
+  console.log(`  - data imports: ${businessDataImportsRepo.list().length}`);
+  console.log(`  - solution packages: ${solutionPackagesRepo.list().length}`);
+  console.log(`  - SOWs: ${sowRepo.list().length}`);
+  console.log(`  - acceptance records: ${acceptanceRecordsRepo.list().length}`);
+  console.log(`  - SOW portal token: ${sow.portal_token}`);
 }
 
 main();
