@@ -76,6 +76,36 @@ export interface PaymentMilestone {
   due: string;
 }
 
+/**
+ * Optional outcome-based pricing add-on. Stored inside the `pricing_model`
+ * JSON blob on a SolutionPackage; surfaces on /sow/[id] and /portal/[token]
+ * when present. Use for high-volume scenarios (customer service, lead
+ * qualification, invoice processing) where the customer prefers paying
+ * per-result over a flat retainer.
+ *
+ * Hybrid pricing (a small floor + per-outcome) has 38% better net revenue
+ * retention vs pure subscription in 2026 SaaS surveys, so we default to
+ * letting the consultant attach this alongside (not instead of) milestones.
+ */
+export interface OutcomePricing {
+  /** What counts as one "outcome". Be specific: "客户问题被自动解决（无需人工接管）". */
+  definition: string;
+  unit_price_cents: number;
+  /** Optional minimum monthly fee. */
+  monthly_floor_cents?: number;
+  /** Optional cap so the customer can budget upper-bound. */
+  monthly_cap_cents?: number;
+  /** Free text: how the outcome will be measured & disputed. */
+  measurement_notes?: string;
+}
+
+export interface PricingModel {
+  recommended_cents?: number;
+  recommended_monthly_cents?: number;
+  est_days?: number;
+  outcome?: OutcomePricing;
+}
+
 export interface AcceptanceRecord {
   id: number;
   project_id: number | null;
