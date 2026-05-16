@@ -47,7 +47,7 @@
 ### 测试覆盖
 
 - 新增 `tests/csv.test.ts`、`tests/data-import-quality.test.ts`、`tests/search-coverage.test.ts`、`tests/anthropic-eval.test.ts`。
-- 测试总数 169 → 200+，0 失败。
+- 测试总数 169 → 210（v0.5 → v0.5.1），0 失败。
 
 ### 文档
 

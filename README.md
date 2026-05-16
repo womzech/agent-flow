@@ -43,7 +43,7 @@ AgentFlow 围绕这四点，把顾问每天要做的事情结构化：
 
 ### 3. 开发（Development）
 
-- **Template Library**：内置 7 个开箱即用的行业模板：
+- **Template Library**：内置 10 个开箱即用的行业模板（支持行业 / 复杂度 / 关键词筛选）：
   - 销售线索自动录入（lead-intake）
   - 外贸询盘智能回复（inquiry-reply）
   - 报价单一键生成（quote-generator）
@@ -51,6 +51,9 @@ AgentFlow 围绕这四点，把顾问每天要做的事情结构化：
   - Excel 智能批处理（excel-batch）
   - 客服问题自动分类与回复（customer-service）
   - 工程材料价格监控（price-monitor）
+  - 员工入职流程自动化（hr-onboarding）
+  - 银行流水多源对账（finance-reconciliation）
+  - 多平台订单聚合分发（ecommerce-order-routing）
 - 每个模板含：Python 实现 + n8n 工作流 JSON + 客户使用手册模板
 
 ### 4. 交付（Delivery）
@@ -97,7 +100,7 @@ npm run dev           # 启动 http://localhost:3000
 ```bash
 npm run typecheck   # tsc --noEmit
 npm run lint        # next lint
-npm test            # node:test, 179 cases / 40 suites, 0 extra deps
+npm test            # node:test, 210 cases / 46 suites, 0 extra deps
 npm run build       # production build, 55 routes + middleware
 npm run doctor      # environment self-check (Node/.env/DB/migrations/port)
 npm run backup      # hot SQLite backup → data/backups/agent-flow-*.db
@@ -167,14 +170,19 @@ CI 配置见 `.github/workflows/ci.yml`，矩阵 Node 18/20。
   - Tokenized 客户 Portal（`/portal/[token]`）：客户无需登录即可在线确认 SOW
   - 验收记录（AcceptanceRecord）：签收 + 已知限制 + 证据链接
   - 注：本 Portal 为 tokenized 单页确认，不是完整客户账号登录系统
-- [x] **v0.5.1 市场对齐与生产化**（详见 [`docs/v0.6-improvement-backlog.md`](docs/v0.6-improvement-backlog.md)）：
-  - **行业模板覆盖 +43%**：新增 hr-onboarding / finance-reconciliation / ecommerce-order-routing（共 10 个模板）
-  - **Token 安全收紧**：share_token / portal_token 30 天 TTL + 顾问端撤回 + 访问统计（schema v6）
+- [x] **v0.5.1 市场对齐与生产化**（详见 [`docs/v0.6-improvement-backlog.md`](docs/v0.6-improvement-backlog.md) + [`docs/v0.6-sprint2-backlog.md`](docs/v0.6-sprint2-backlog.md)）：
+  - **行业模板覆盖 +43%**：新增 hr-onboarding / finance-reconciliation / ecommerce-order-routing（共 10 个模板）+ `/templates` 行业/复杂度/关键词筛选
+  - **Token 安全收紧**：share_token / portal_token 30 天 TTL + 顾问端可撤回（写审计）+ 访问统计 UI（schema v6）
   - **Anthropic SDK 生产化**：prompt caching（system + 模板目录）+ 指数回退重试 + 60s 超时
+  - **AI 输出回归测试**：`tests/anthropic-eval.test.ts` 盯死诊断报告 8 章节 schema 不漂移
   - **运维基线**：`npm run doctor` 自检 / `npm run backup` 热备 / `npm run cleanup` 数据保留
   - **容器化**：Multi-stage Dockerfile + docker-compose.yml（详见 `docs/deploy-docker.md`）
   - **可观测性**：结构化 JSON 日志（`src/lib/log.ts`）
   - **模板成品化**：price-monitor / lead-intake 不再有 TODO 占位符
+  - **全局搜索完整**：FTS5 索引扩展到 v0.5 实体（imports / packages / SOW / acceptance）
+  - **中国 AI 合规起步**：客户数据 PII 检测（身份证/手机/邮箱/银行卡/护照）+ 算法备案号页脚占位（`AGENTFLOW_ALGORITHM_FILING`）
+  - **按结果定价模型**：SolutionPackage 支持 OutcomePricing；`docs/sales-playbook.md` 附完整定价对照与"如何定义 1 次结果"清单
+  - **demo 闭环**：`scripts/seed.ts` 现在产生完整 Delivery OS 链（import → package → SOW → acceptance）
 - [ ] **v0.6 SaaS 化 + 完整客户账号 Portal**：客户可登录自助查看进度、提工单、付月费；多顾问工作区支持
 - [ ] **v0.7 IM 接入扩展**：钉钉 / 飞书 / Lark 接入 + 多账号
 

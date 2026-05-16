@@ -54,12 +54,31 @@
 - 6 个 slash 命令（`/lead`、`/diag`、`/project`、`/help` 等）+ Claude haiku 中文意图路由
 - 推送：`src/lib/wecom/notify.ts` 封装主动消息发送（无配置时 no-op）
 
-## FTS5 全文搜索（v0.4）
+## FTS5 全文搜索（v0.4 → v0.5.1 扩展）
 
 - 虚拟表 `search_index`（trigram tokenizer）在 `search.ts` 中懒初始化
-- 覆盖实体：`lead` / `client` / `diagnostic` / `project`
-- 搜索结果按当前用户权限过滤可见 `kind`
-- **搜索缺口（v0.6 backlog）**：v0.5 新增的 `business_data_imports` / `solution_packages` / `statement_of_work` / `acceptance_records` 尚未并入 FTS5
+- v0.5.1 起覆盖 8 类实体：`lead` / `client` / `diagnostic` / `project` / `import` / `package` / `sow` / `acceptance`
+- 搜索结果按当前用户权限过滤可见 `kind`：
+  - `read:leads` → lead
+  - `read:clients` → client + import
+  - `read:diagnostics` → diagnostic
+  - `read:projects` → project + package + sow + acceptance
+- `rebuildAll()` 一次性从 8 张源表回灌索引；新增条目可通过 `indexEntity(kind, refId, title, body)` 增量更新
+
+## Token 化外发链接（v0.5 + v0.5.1 hardening）
+
+- 两条 token：`diagnostics.share_token`（诊断分享）与 `statement_of_work.portal_token`（SOW 客户门户）
+- v0.5.1 schema v6：每条 token 都附 4 个字段（通过 `applyAlterColumnMigrations()` 幂等 ALTER）：
+  - `token_expires_at` — 默认 30 天 TTL，可通过 `ensureShareToken({ttlDays})` / `sowRepo.create({portal_token_ttl_days})` 自定义
+  - `token_revoked_at` — 撤回时间戳，公开页直接返回"已失效"
+  - `token_view_count` + `token_last_viewed_at` — 每次客户访问递增，顾问端 UI 可见
+- `/diagnostics/[id]` 与 `/sow/[id]` 提供撤回按钮（Server Action），调用 `revokeShareToken` / `revokePortalToken` 并写审计（`share.revoke` / `portal.revoke`）
+- 周期性 `npm run cleanup` 会把过期且非活跃的 token 列设为 NULL，缩小公开攻击面
+
+## 合规与隐私
+
+- **算法备案号占位**：`src/components/layout/compliance-footer.tsx` 读取 `AGENTFLOW_ALGORITHM_FILING` 环境变量，在 app 页脚 + 所有公开页（`/share/[token]` / `/portal/[token]`）渲染"算法备案号：xxx"，符合中国生成式 AI 服务"显著位置展示"要求；空值时不渲染
+- **PII 检测**：`src/lib/data-import.ts` 的 `detectPii()` 用正则识别身份证 / 手机 / 邮箱 / 银行卡（列名启发式）/ 护照，≥2 匹配触发，写入 `DataQualitySummary.piiFlags`；`/data-imports/[id]` 红色横幅展示脱敏样例，提醒顾问按 PIPL 最小化原则评估
 
 ## 目录约定
 
@@ -104,22 +123,23 @@ src/
 │       └── wecom/callback/
 ├── components/
 │   ├── ui/                     # 基础组件（Button, Card, Input, Dialog）
-│   ├── layout/                 # Sidebar, Topbar
+│   ├── layout/                 # Sidebar, Topbar, ComplianceFooter（v0.5.1）
 │   ├── leads/                  # Kanban 等领域组件
 │   ├── diagnostics/
 │   ├── blueprints/
 │   └── delivery-os/            # v0.5 Delivery OS 组件
 └── lib/
-    ├── db.ts                   # better-sqlite3 实例 + 通用查询
-    ├── schema.ts               # 表定义（SCHEMA_VERSION=5）+ 迁移 + RBAC catalog
-    ├── repo.ts                 # 仓库层（按表分组的纯函数）
-    ├── delivery-os.ts          # Delivery OS 仓库层（v0.5）
-    ├── data-import.ts          # CSV / Excel 解析 + 数据质量分析（v0.5）
-    ├── anthropic.ts            # Claude client + prompt builders
-    ├── templates.ts            # 内置模板
+    ├── db.ts                   # better-sqlite3 实例 + 通用查询（含 v6 idempotent ALTER）
+    ├── schema.ts               # 表定义（SCHEMA_VERSION=6）+ 迁移 + RBAC catalog
+    ├── repo.ts                 # 仓库层 + isTokenExpired / revokeShareToken / recordShareView（v0.5.1）
+    ├── delivery-os.ts          # Delivery OS 仓库层（v0.5）+ OutcomePricing / 撤回/视图统计（v0.5.1）
+    ├── data-import.ts          # CSV / Excel 解析 + 数据质量分析 + PII 检测（v0.5.1）
+    ├── anthropic.ts            # Claude client + prompt caching + 指数回退重试（v0.5.1）
+    ├── log.ts                  # 结构化 JSON logger（v0.5.1）
+    ├── templates.ts            # 内置 10 个模板（v0.5.1）
     ├── pricing.ts              # 报价计算
     ├── bundler.ts              # 交付物打包
-    ├── search.ts               # FTS5 搜索（v0.4）
+    ├── search.ts               # FTS5 搜索（v0.4 / v0.5.1 扩展到 8 类）
     ├── auth.ts                 # 登录 / PBKDF2 / cookie
     ├── sessions.ts             # 服务端 session 管理（v0.4）
     ├── api-tokens.ts           # PAT 管理（v0.4）
@@ -232,6 +252,8 @@ src/
 ## 未来扩展点
 
 - **DB 切换**：把 `src/lib/db.ts` 抽象到 `interface`，将来可以替换为 Postgres。
-- **FTS5 扩展**：将 Delivery OS v0.5 实体（imports / packages / SOW / acceptance）加入 `search_index`，需扩展 `SearchKind` + `rebuildAll()` + 权限映射（当前为 v0.6 backlog）。
+- **LLM gateway**：当前只对接 Anthropic。`src/lib/anthropic.ts` 已经把客户端单例化，下一步抽象为 provider 接口以支持 DeepSeek / 通义 / 智谱 / 本地 vLLM（v0.6 backlog 的 F2 项，敏感行业必备）。
+- **向量数据库**：当前 `doc-qa-bot` / `inquiry-reply` 模板让客户自带 Chroma；平台层未集成。v0.6 backlog 计划接入 sqlite-vec 或 Chroma。
 - **Bundler 扩展**：增加 makefile / docker / pip-requirements 输出。
 - **多租户**：当前单机单顾问；SaaS 化需在 `users` 表加 `org_id`，所有查询加租户过滤。
+- **电子签名**：`AcceptanceRecord.signoff_status` 现是文本枚举，v0.6 可接入 hash-chain 或 DocuSign 类外部签名。
