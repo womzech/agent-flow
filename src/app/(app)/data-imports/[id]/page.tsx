@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { businessDataImportsRepo } from "@/lib/delivery-os";
 import type { ColumnInfo, DataQualitySummary } from "@/lib/data-import";
+import { PII_LABELS } from "@/lib/data-import";
 import { Card, CardHeader, CardTitle, CardDescription, Pill, Button } from "@/components/ui";
 import { fmtDate } from "@/lib/utils";
 import GeneratePackageButton from "./generate-package-button";
@@ -82,6 +83,31 @@ export default async function DataImportDetailPage({ params }: { params: { id: s
           </Card>
         ))}
       </div>
+
+      {/* PII flags — surfaced prominently for compliance reviewers */}
+      {(summary.piiFlags ?? []).length > 0 && (
+        <Card className="border-rose-500/40 bg-rose-500/5">
+          <CardHeader>
+            <CardTitle>⚠ 个人信息（PII）检测</CardTitle>
+            <Pill tone="danger">{summary.piiFlags.length} 个字段</Pill>
+          </CardHeader>
+          <p className="mb-3 text-xs text-rose-200">
+            上传到云端 LLM（含本系统调用的 Anthropic）前请脱敏；按 PIPL 最小化收集原则评估是否必须保留这些字段。
+          </p>
+          <div className="space-y-2">
+            {summary.piiFlags.map((f, i) => (
+              <div key={i} className="flex items-center justify-between rounded-md bg-forge p-3 text-sm">
+                <div>
+                  <span className="font-medium text-ink-100">{f.column}</span>
+                  <span className="ml-2 text-rose-300">{PII_LABELS[f.kind] ?? f.kind}</span>
+                  <span className="ml-2 text-forge-muted">样例：{f.redactedSamples.join(" / ")}</span>
+                </div>
+                <Pill tone="warning">{f.matchCount} 条</Pill>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Issues */}
       {(summary.issues ?? []).length > 0 && (

@@ -20,6 +20,17 @@ export interface SLAViolation {
   violationPct: number;
 }
 
+export type PiiKind = "id_card_cn" | "phone_cn" | "email" | "bank_card" | "passport";
+
+export interface PiiFlag {
+  column: string;
+  kind: PiiKind;
+  /** Number of rows in this column matching the PII pattern. */
+  matchCount: number;
+  /** Up to 2 redacted sample cell preview ("110***********34") for the UI to show. */
+  redactedSamples: string[];
+}
+
 export interface DataQualitySummary {
   totalRows: number;
   totalColumns: number;
@@ -28,6 +39,8 @@ export interface DataQualitySummary {
   missingCellsPct: number;
   columns: ColumnInfo[];
   slaViolations: SLAViolation[];
+  /** Per-column PII detection. Empty array means no PII detected. */
+  piiFlags: PiiFlag[];
   issues: string[];
   recommendations: string[];
   suggestedTemplates: string[];
@@ -184,11 +197,70 @@ function countDuplicateRows(rows: Record<string, string>[]): number {
   return dupes;
 }
 
+/**
+ * Detect Chinese-context PII in uploaded data. Regex-only — no LLM call needed,
+ * conservative thresholds (>= 2 matches in a column before flagging). The aim
+ * is to warn the consultant, not to block. The customer ultimately decides
+ * whether to upload after redaction.
+ */
+const PII_RULES: { kind: PiiKind; pattern: RegExp; minLen?: number }[] = [
+  // 18-digit mainland ID card (last char may be X)
+  { kind: "id_card_cn", pattern: /^\s*[1-9]\d{5}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]\s*$/ },
+  // Mainland mobile: 11 digits starting with 1, second digit 3-9
+  { kind: "phone_cn", pattern: /^\s*(?:\+?86[\s-]?)?1[3-9]\d{9}\s*$/ },
+  // Email
+  { kind: "email", pattern: /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/ },
+  // Bank card: 13-19 digits (loose) — pair with column-name heuristic to cut noise
+  { kind: "bank_card", pattern: /^\s*\d{13,19}\s*$/, minLen: 13 },
+  // Passport: 1 letter + 8-9 digits, common formats for CN/HK/Macao
+  { kind: "passport", pattern: /^\s*[A-Z]\d{7,9}\s*$/i },
+];
+
+function looksBankCardColumn(name: string): boolean {
+  return /(?:card|account|bank|银行|卡号|账号|账户)/i.test(name);
+}
+
+export function detectPii(headers: string[], rows: Record<string, string>[]): PiiFlag[] {
+  const flags: PiiFlag[] = [];
+  for (const header of headers) {
+    for (const rule of PII_RULES) {
+      // bank_card is generic numeric — only flag if column name hints at it.
+      if (rule.kind === "bank_card" && !looksBankCardColumn(header)) continue;
+      let matchCount = 0;
+      const samples: string[] = [];
+      for (const row of rows) {
+        const v = row[header];
+        if (v && rule.pattern.test(v)) {
+          matchCount++;
+          if (samples.length < 2) samples.push(redactPii(v, rule.kind));
+        }
+      }
+      if (matchCount >= 2) {
+        flags.push({ column: header, kind: rule.kind, matchCount, redactedSamples: samples });
+        break; // one kind per column max
+      }
+    }
+  }
+  return flags;
+}
+
+function redactPii(raw: string, kind: PiiKind): string {
+  const v = raw.trim();
+  if (kind === "email") {
+    const at = v.indexOf("@");
+    if (at < 2) return "***" + v.slice(at);
+    return v.slice(0, 1) + "***" + v.slice(at);
+  }
+  if (v.length <= 4) return "****";
+  return v.slice(0, 2) + "*".repeat(Math.max(3, v.length - 4)) + v.slice(-2);
+}
+
 /** Full quality analysis pipeline: parse → infer → analyze → recommend. */
 export function analyzeQuality(headers: string[], rows: Record<string, string>[]): DataQualitySummary {
   const columns = inferColumns(headers, rows);
   const slaViolations = detectSLAViolations(headers, rows, columns);
   const duplicateRows = countDuplicateRows(rows);
+  const piiFlags = detectPii(headers, rows);
 
   const missingCellsTotal = columns.reduce((s, c) => s + c.missingCount, 0);
   const totalCells = rows.length * headers.length;
@@ -237,6 +309,16 @@ export function analyzeQuality(headers: string[], rows: Record<string, string>[]
     recommendations.push(`数值字段「${numericCols.map((c) => c.name).join("、")}」有较多空值，推荐增加数据收集规范`);
   }
 
+  // PII findings turn into issues + recommendations
+  if (piiFlags.length > 0) {
+    issues.push(
+      `检测到 ${piiFlags.length} 个字段包含个人信息（PII）：${piiFlags.map((f) => `${f.column}(${PII_LABELS[f.kind]})`).join("、")}`,
+    );
+    recommendations.push(
+      "上传到云端 LLM 前请先脱敏 / 加密；最小化收集（PIPL）原则下，仅保留业务流程必需字段",
+    );
+  }
+
   const suggestedTemplates = suggestTemplates(columns, slaViolations, issues);
 
   return {
@@ -247,11 +329,20 @@ export function analyzeQuality(headers: string[], rows: Record<string, string>[]
     missingCellsPct,
     columns,
     slaViolations,
+    piiFlags,
     issues,
     recommendations,
     suggestedTemplates,
   };
 }
+
+export const PII_LABELS: Record<PiiKind, string> = {
+  id_card_cn: "身份证号",
+  phone_cn: "手机号",
+  email: "邮箱",
+  bank_card: "银行卡 / 账户号",
+  passport: "护照号",
+};
 
 function suggestTemplates(
   columns: ColumnInfo[],
