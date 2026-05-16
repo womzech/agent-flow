@@ -27,7 +27,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "开发 Development",
-    items: [{ href: "/templates", label: "模板库", hint: "7 个内置模板", require: "read:templates" }],
+    items: [{ href: "/templates", label: "模板库", hint: "10 个内置模板", require: "read:templates" }],
   },
   {
     title: "交付 Delivery",

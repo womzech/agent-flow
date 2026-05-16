@@ -2,6 +2,80 @@
 
 本仓库遵循 [Semantic Versioning](https://semver.org/) 与 [Keep a Changelog](https://keepachangelog.com/) 风格。
 
+## v0.5.1 — 2026-05-16 · 市场对齐与生产化
+
+复盘 v0.5 后做了一轮市场调研 + repo 全审计（产出 [`docs/v0.6-improvement-backlog.md`](docs/v0.6-improvement-backlog.md)，列出 62 项改进），首批交付 13 项。第二批本次再交付 13 项（详见 [`docs/v0.6-sprint2-backlog.md`](docs/v0.6-sprint2-backlog.md)）。
+
+### 模板覆盖
+
+- 模板库 7 → 10：新增 `hr-onboarding`（员工入职多系统开通）、`finance-reconciliation`（银行流水多源对账）、`ecommerce-order-routing`（多平台订单聚合分发）。
+- `price-monitor` 与 `lead-intake` 不再有 TODO 占位符，可直接交付演示。
+
+### 数据与 Token 安全
+
+- Schema v6：share_token / portal_token 增加 `token_expires_at`（默认 30 天 TTL）、`token_revoked_at`、`token_view_count`、`token_last_viewed_at`（idempotent ALTER）。
+- `/share/[token]` 与 `/portal/[token]` 在 token 过期 / 撤回时返回友好"已失效"页；每次访问递增计数。
+- 顾问可在 `/diagnostics/[id]` 与 `/sow/[id]` 主动撤回外发链接，写入审计日志。
+- 全局搜索 FTS5 索引扩展到 v0.5 实体（`solution_packages` / `statement_of_work` / `business_data_imports` / `acceptance_records`）。
+
+### AI / Anthropic SDK
+
+- 诊断生成启用 prompt caching（system + 模板目录走 ephemeral cache_control）。
+- SDK 接入指数回退重试（5xx/429/timeout 重试 3 次），显式 60s 超时。
+- usage 日志记录 `cache_read_input_tokens` / `cache_creation_input_tokens` / `input_tokens` / `output_tokens`。
+
+### 合规与隐私（中国 AI 监管对齐）
+
+- 客户上传 CSV/Excel 时自动检测 PII（身份证、手机、邮箱、银行卡）并在 `dataQualitySummary.piiFlags` 落档 + UI 红色横幅。
+- 页脚与公开页支持「算法备案号」展示（读取 `AGENTFLOW_ALGORITHM_FILING` 环境变量）。
+- SOW 模板新增「按结果定价（per-outcome）」字段；销售剧本附使用建议。
+
+### 运维基线
+
+- `npm run doctor` — Node / .env / DB / 迁移 / 端口自检（pre-deploy gate）。
+- `npm run backup` — SQLite Online Backup API 热备到 `data/backups/`。
+- `npm run cleanup -- --dry` — 清理过期 token、过期 login_attempts、过期 sessions（idempotent）。
+- Multi-stage `Dockerfile` + `docker-compose.yml` + `.dockerignore`（详见 `docs/deploy-docker.md`）。
+- 结构化 JSON logger（`src/lib/log.ts`），`AGENTFLOW_LOG_LEVEL` 可调。
+
+### 体验
+
+- `/templates` 增加行业 / 复杂度 / 关键词三种筛选（URL-synced query params）。
+- 诊断 / SOW 详情页显示「访问 N 次 · 最近访问 时间」摘要。
+- Sidebar 模板数量提示同步到 10。
+
+### 测试覆盖
+
+- 新增 `tests/csv.test.ts`、`tests/data-import-quality.test.ts`、`tests/search-coverage.test.ts`、`tests/anthropic-eval.test.ts`。
+- 测试总数 169 → 200+，0 失败。
+
+### 文档
+
+- `docs/v0.6-improvement-backlog.md` — 完整 62 项改进路线图。
+- `docs/v0.6-sprint2-backlog.md` — 本轮 13 项细节。
+- `docs/ops-runbook.md` — 备份 / 恢复演练 / 分支保护推荐。
+- `docs/deploy-docker.md` — Docker 一键启动。
+
+## v0.5.0 — 2026-05-14 · Delivery OS
+
+v0.5 主线：把销售→交付的"中段"做成结构化数据。诊断之后客户上传业务样本数据，AI 出方案包 → SOW → 客户在 Portal 在线确认 → 验收记录。
+
+### 数据流
+
+- **客户数据导入**（`business_data_imports` 表，`src/lib/data-import.ts`）：上传 CSV 或 Excel（.xlsx），自动推断字段类型、null 率、SLA 违规率，输出 `dataQualitySummary`。
+- **方案包**（`solution_packages` 表）：结构化的可售方案 — 目标场景、问题陈述、自动化步骤、交付物、验收标准、定价模型。
+- **SOW（工作说明书）**（`statement_of_work` 表）：范围（included / excluded）、假设、deliverables、里程碑付款、portal_token、客户审批状态。
+- **客户 Portal**（`/portal/[token]`）：tokenized 公开页（无需登录账号），客户可看完整 SOW + 一键确认。
+- **验收记录**（`acceptance_records` 表）：已接受功能、已知限制、证据链接、客户签收时间、签收状态。
+
+### 模板与依赖
+
+- 新增 `xlsx` 依赖（Delivery OS Excel 上传的明确例外，AGENTS.md 已固化"该例外不再扩大"原则）。
+
+### E2E 验证
+
+- `npm run e2e:delivery-flow`：lead → diagnostic → solution package → SOW → portal approve → acceptance record 端到端脚本。
+
 ## v0.4.0 — 2026-05-14 · Security & Scale Hardening
 
 第四轮迭代：闭合 v0.3 → v0.4 review 中识别的 8 个 P0/P1 安全 & 可扩展性 gap。设计文档：`docs/v0.4-hardening-design.md`。9 个原子 commit。

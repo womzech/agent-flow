@@ -16,10 +16,12 @@
  *    statement_of_work (SOW with client portal token), acceptance_records
  *    (signoff tracking). Enables the full lead→import→diagnosis→package→SOW→
  *    portal→acceptance closed loop.
- *  - v6 (2026-05-16): Tokenized link hardening — add expires_at / revoked_at /
- *    view_count / last_viewed_at to diagnostics.share_token and
- *    statement_of_work.portal_token. Columns added idempotently via ALTER
- *    in db.ts; no SCHEMA_SQL change.
+ *  - v6 (2026-05-16): Tokenized link hardening — add token_expires_at /
+ *    token_revoked_at / token_view_count / token_last_viewed_at on both
+ *    diagnostics (share_token) and statement_of_work (portal_token).
+ *    These 4 columns are added per-table by `applyAlterColumnMigrations()`
+ *    in db.ts (NOT in SCHEMA_SQL below) so existing v5 databases upgrade
+ *    in place. Fresh databases get the columns the same way on first open.
  */
 
 export const SCHEMA_VERSION = 6;
@@ -406,6 +408,7 @@ export const AUDIT_ACTIONS = [
   "package.create",
   "sow.create", "sow.approve",
   "acceptance.create", "acceptance.sign",
+  "share.revoke", "portal.revoke",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
