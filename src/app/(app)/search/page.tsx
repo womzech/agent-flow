@@ -10,6 +10,10 @@ const KIND_LABEL: Record<SearchKind, string> = {
   client: "客户",
   diagnostic: "诊断",
   project: "项目",
+  import: "数据导入",
+  package: "方案包",
+  sow: "SOW",
+  acceptance: "验收",
 };
 
 const KIND_HREF: Record<SearchKind, (id: number) => string> = {
@@ -17,6 +21,10 @@ const KIND_HREF: Record<SearchKind, (id: number) => string> = {
   client: (id) => `/clients/${id}`,
   diagnostic: (id) => `/diagnostics/${id}`,
   project: (id) => `/projects/${id}`,
+  import: (id) => `/data-imports/${id}`,
+  package: (id) => `/solution-packages/${id}`,
+  sow: (id) => `/sow/${id}`,
+  acceptance: (id) => `/projects/${id}/acceptance`,
 };
 
 const KIND_TONE: Record<SearchKind, "neutral" | "accent" | "warning" | "success"> = {
@@ -24,6 +32,10 @@ const KIND_TONE: Record<SearchKind, "neutral" | "accent" | "warning" | "success"
   client: "success",
   diagnostic: "accent",
   project: "neutral",
+  import: "neutral",
+  package: "accent",
+  sow: "warning",
+  acceptance: "success",
 };
 
 export default async function SearchPage({ searchParams }: { searchParams: { q?: string } }) {
