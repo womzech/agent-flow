@@ -2,11 +2,25 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Card, PageHeader, Pill, Section } from "@/components/ui";
 import { GenerateReportForm } from "@/components/diagnostics/generate-form";
-import { clientsRepo, diagnosticsRepo, projectsRepo } from "@/lib/repo";
+import { clientsRepo, diagnosticsRepo, isTokenExpired, projectsRepo } from "@/lib/repo";
 import { TEMPLATE_BY_SLUG } from "@/lib/templates";
 import { fmtCents, fmtDate, renderMarkdown } from "@/lib/utils";
+import { record as auditRecord } from "@/lib/audit";
+import { currentUser } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
+
+async function revokeShareLink(id: number) {
+  "use server";
+  const me = await currentUser();
+  diagnosticsRepo.revokeShareToken(id);
+  auditRecord({
+    actor: me?.user.email ?? "unknown",
+    action: "share.revoke",
+    entity: "diagnostic",
+    entityId: id,
+  });
+}
 
 async function convertToProject(id: number) {
   "use server";
@@ -60,6 +74,15 @@ export default function DiagnosticDetailPage({ params }: { params: { id: string 
     goals?: string[];
   };
   const convert = convertToProject.bind(null, id);
+  const revoke = revokeShareLink.bind(null, id);
+  const shareActive = !!d.share_token && !d.token_revoked_at && !isTokenExpired(d.token_expires_at);
+  const shareStatus = !d.share_token
+    ? null
+    : d.token_revoked_at
+      ? "已撤回"
+      : isTokenExpired(d.token_expires_at)
+        ? "已过期"
+        : "有效";
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -68,7 +91,7 @@ export default function DiagnosticDetailPage({ params }: { params: { id: string 
         description={`${d.client_id ? "已关联客户" : "未关联客户"} · 创建于 ${fmtDate(d.created_at)}`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            {d.share_token ? (
+            {shareActive ? (
               <>
                 <Link href={`/share/${d.share_token}`} target="_blank" className="rounded-md border border-forge-line bg-forge px-3 py-1.5 text-sm hover:bg-forge-line/60">
                   分享链接
@@ -76,6 +99,11 @@ export default function DiagnosticDetailPage({ params }: { params: { id: string 
                 <Link href={`/share/${d.share_token}/print`} target="_blank" className="rounded-md border border-forge-line bg-forge px-3 py-1.5 text-sm hover:bg-forge-line/60">
                   打印版
                 </Link>
+                <form action={revoke}>
+                  <button className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-sm text-rose-200 hover:bg-rose-500/20">
+                    撤回链接
+                  </button>
+                </form>
               </>
             ) : null}
             <a href={`/api/export/diagnostics/${id}`} className="rounded-md border border-forge-line bg-forge px-3 py-1.5 text-sm hover:bg-forge-line/60">
@@ -100,6 +128,20 @@ export default function DiagnosticDetailPage({ params }: { params: { id: string 
           <div className="text-xs uppercase tracking-wider text-forge-muted">状态</div>
           <div className="mt-2"><Pill tone={d.status === "ready" || d.status === "shared" ? "success" : d.status === "converted" ? "accent" : "neutral"}>{d.status}</Pill></div>
           <div className="mt-2 text-xs text-forge-muted">{d.model_used ?? "尚未生成"}</div>
+          {d.share_token ? (
+            <div className="mt-3 border-t border-forge-line/40 pt-2 text-xs text-forge-muted">
+              <div>分享链接：<span className={shareStatus === "有效" ? "text-emerald-300" : "text-rose-300"}>{shareStatus}</span></div>
+              {shareActive ? (
+                <>
+                  <div>访问次数：<span className="text-ink-100">{d.token_view_count}</span></div>
+                  <div>最近访问：{d.token_last_viewed_at ? fmtDate(d.token_last_viewed_at) : "—"}</div>
+                  <div>到期：{d.token_expires_at ? fmtDate(d.token_expires_at) : "—"}</div>
+                </>
+              ) : (
+                <div>{d.token_revoked_at ? `撤回于 ${fmtDate(d.token_revoked_at)}` : "已过期"}</div>
+              )}
+            </div>
+          ) : null}
         </Card>
         <Card>
           <div className="text-xs uppercase tracking-wider text-forge-muted">推荐项目费</div>

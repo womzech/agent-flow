@@ -1,12 +1,27 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { sowRepo, solutionPackagesRepo } from "@/lib/delivery-os";
-import type { PaymentMilestone } from "@/lib/delivery-os";
+import type { PaymentMilestone, PricingModel } from "@/lib/delivery-os";
+import { isTokenExpired } from "@/lib/repo";
 import { Card, CardHeader, CardTitle, CardDescription, Pill } from "@/components/ui";
 import { fmtCents, fmtDate } from "@/lib/utils";
+import { record as auditRecord } from "@/lib/audit";
+import { currentUser } from "@/lib/current-user";
 import ApproveSOWButton from "./approve-sow-button";
 
 export const dynamic = "force-dynamic";
+
+async function revokePortal(id: number) {
+  "use server";
+  const me = await currentUser();
+  sowRepo.revokePortalToken(id);
+  auditRecord({
+    actor: me?.user.email ?? "unknown",
+    action: "portal.revoke",
+    entity: "sow",
+    entityId: id,
+  });
+}
 
 const APPROVAL_TONES: Record<string, "neutral" | "warning" | "success" | "danger"> = {
   pending: "warning",
@@ -34,8 +49,19 @@ export default async function SOWPage({ params }: { params: { id: string } }) {
   const assumptions: string[] = sowRepo.parseField(sow.assumptions, []);
   const deliverables: string[] = sowRepo.parseField(sow.deliverables, []);
   const milestones: PaymentMilestone[] = sowRepo.parseField(sow.payment_milestones, []);
+  const pricingModel: PricingModel = pkg ? solutionPackagesRepo.parseField(pkg.pricing_model, {}) : {};
+  const outcome = pricingModel.outcome;
 
-  const portalUrl = sow.portal_token ? `/portal/${sow.portal_token}` : null;
+  const portalActive = !!sow.portal_token && !sow.token_revoked_at && !isTokenExpired(sow.token_expires_at);
+  const portalUrl = portalActive ? `/portal/${sow.portal_token}` : null;
+  const portalStatus = !sow.portal_token
+    ? null
+    : sow.token_revoked_at
+      ? "已撤回"
+      : isTokenExpired(sow.token_expires_at)
+        ? "已过期"
+        : "有效";
+  const revokePortalBound = revokePortal.bind(null, id);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-8">
@@ -72,6 +98,13 @@ export default async function SOWPage({ params }: { params: { id: string } }) {
               </span>
             </Link>
           )}
+          {portalActive && (
+            <form action={revokePortalBound}>
+              <button className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-200 hover:bg-rose-500/20">
+                撤回门户链接
+              </button>
+            </form>
+          )}
         </div>
       </div>
 
@@ -92,10 +125,56 @@ export default async function SOWPage({ params }: { params: { id: string } }) {
               查看 →
             </Link>
           ) : (
-            <div className="mt-1 text-sm text-forge-muted">暂无</div>
+            <div className="mt-1 text-sm text-forge-muted">{portalStatus ?? "暂无"}</div>
+          )}
+          {sow.portal_token && (
+            <div className="mt-2 border-t border-forge-line/40 pt-2 text-xs text-forge-muted">
+              <div>状态：<span className={portalStatus === "有效" ? "text-emerald-300" : "text-rose-300"}>{portalStatus}</span></div>
+              {portalActive ? (
+                <>
+                  <div>访问次数：<span className="text-ink-100">{sow.token_view_count}</span></div>
+                  <div>最近访问：{sow.token_last_viewed_at ? fmtDate(sow.token_last_viewed_at) : "—"}</div>
+                  <div>到期：{sow.token_expires_at ? fmtDate(sow.token_expires_at) : "—"}</div>
+                </>
+              ) : (
+                <div>{sow.token_revoked_at ? `撤回于 ${fmtDate(sow.token_revoked_at)}` : "已过期"}</div>
+              )}
+            </div>
           )}
         </Card>
       </div>
+
+      {/* Outcome-based pricing (optional, attached on the solution package) */}
+      {outcome && (
+        <Card>
+          <CardHeader>
+            <CardTitle>按结果定价</CardTitle>
+            <CardDescription>除里程碑外的浮动条款</CardDescription>
+          </CardHeader>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-md bg-forge p-3 text-sm">
+              <div className="text-xs text-forge-muted">单次结果定义</div>
+              <div className="mt-1 text-ink-100">{outcome.definition}</div>
+            </div>
+            <div className="rounded-md bg-forge p-3 text-sm">
+              <div className="text-xs text-forge-muted">单价</div>
+              <div className="mt-1 text-ink-100">{fmtCents(outcome.unit_price_cents)} / 次</div>
+              {outcome.monthly_floor_cents !== undefined && (
+                <div className="mt-1 text-xs text-forge-muted">月度保底：{fmtCents(outcome.monthly_floor_cents)}</div>
+              )}
+              {outcome.monthly_cap_cents !== undefined && (
+                <div className="mt-1 text-xs text-forge-muted">月度封顶：{fmtCents(outcome.monthly_cap_cents)}</div>
+              )}
+            </div>
+            {outcome.measurement_notes && (
+              <div className="md:col-span-2 rounded-md bg-forge p-3 text-sm text-ink-200">
+                <div className="text-xs text-forge-muted">计量与争议处理</div>
+                <div className="mt-1 whitespace-pre-wrap">{outcome.measurement_notes}</div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Payment Milestones */}
       {milestones.length > 0 && (
